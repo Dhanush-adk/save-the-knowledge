@@ -1,0 +1,77 @@
+# XcodeGen spec. Run: xcodegen generate
+name: KnowledgeCache
+options:
+  bundleIdPrefix: com.knowledgecache
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "15.0"
+  generateEmptyDirectories: true
+targets:
+  KnowledgeCache:
+    type: application
+    platform: macOS
+    sources:
+      - path: KnowledgeCache
+        excludes:
+          - "*.xcassets"
+          - "EmbeddingModel.mlpackage"
+          - "EmbeddingModel.mlmodel"
+    resources:
+      - path: scripts/extract_structured.py
+      - path: KnowledgeCache/EmbeddingModel.mlpackage
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.knowledgecache.app
+        INFOPLIST_FILE: KnowledgeCache/Info.plist
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
+        SWIFT_EMIT_LOC_STRINGS: "YES"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        SWIFT_VERSION: "5.9"
+        PRODUCT_NAME: KnowledgeCache
+        CODE_SIGN_ENTITLEMENTS: KnowledgeCache/KnowledgeCache.entitlements
+        ENABLE_APP_SANDBOX: "YES"
+        COMBINE_HIDPI_IMAGES: "YES"
+    postBuildScripts:
+      - name: Copy EmbeddingModel
+        script: |
+          DST="${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
+          if [ -f "${SRCROOT}/KnowledgeCache/EmbeddingModel.mlmodel" ]; then
+            cp "${SRCROOT}/KnowledgeCache/EmbeddingModel.mlmodel" "${DST}/"
+          fi
+          if [ -d "${SRCROOT}/KnowledgeCache/EmbeddingModel.mlpackage" ]; then
+            cp -R "${SRCROOT}/KnowledgeCache/EmbeddingModel.mlpackage" "${DST}/"
+          fi
+    dependencies:
+      - sdk: libsqlite3.tbd
+      - sdk: WebKit.framework
+  KnowledgeCacheTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/KnowledgeCacheTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.knowledgecache.tests
+        SWIFT_VERSION: "5.9"
+        GENERATE_INFOPLIST_FILE: "YES"
+    dependencies:
+      - target: KnowledgeCache
+schemes:
+  KnowledgeCache:
+    build:
+      targets:
+        KnowledgeCache: all
+        KnowledgeCacheTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - KnowledgeCacheTests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

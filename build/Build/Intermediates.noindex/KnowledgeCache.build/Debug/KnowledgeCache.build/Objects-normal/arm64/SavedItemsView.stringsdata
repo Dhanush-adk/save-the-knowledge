@@ -1,0 +1,152 @@
+{
+  "source": "/Users/dhanushkumar/Desktop/personal/knowledge-cache/KnowledgeCache/UI/SavedItemsView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Re-index Error",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 176
+        }
+      },
+      {
+        "comment": "",
+        "key": "Filter items...",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 34
+        }
+      },
+      {
+        "comment": "",
+        "key": "Go to Save to add content",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 56
+        }
+      },
+      {
+        "comment": "",
+        "key": "No items saved yet",
+        "location": {
+          "startingColumn": 55,
+          "startingLine": 52
+        }
+      },
+      {
+        "comment": "",
+        "key": "No matching items",
+        "location": {
+          "startingColumn": 78,
+          "startingLine": 52
+        }
+      },
+      {
+        "comment": "",
+        "key": "Truncated",
+        "location": {
+          "startingColumn": 43,
+          "startingLine": 90
+        }
+      },
+      {
+        "comment": "",
+        "key": "Delete",
+        "location": {
+          "startingColumn": 43,
+          "startingLine": 102
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld items",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 121
+        }
+      },
+      {
+        "comment": "",
+        "key": "Optimize",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 128
+        }
+      },
+      {
+        "comment": "",
+        "key": "Re-index",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 135
+        }
+      },
+      {
+        "comment": "",
+        "key": "Select an item to view details",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 154
+        }
+      },
+      {
+        "comment": "",
+        "key": "Re-indexing embeddings...",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 164
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 177
+        }
+      },
+      {
+        "comment": "",
+        "key": "Content Preview",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 221
+        }
+      },
+      {
+        "comment": "",
+        "key": "... %lld more characters",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 234
+        }
+      },
+      {
+        "comment": "",
+        "key": "Hash: %@...",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 213
+        }
+      },
+      {
+        "comment": "",
+        "key": "Pasted text",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 206
+        }
+      },
+      {
+        "comment": "",
+        "key": "Delete Item",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 247
+        }
+      }
+    ]
+  },
+  "version": 1
+}

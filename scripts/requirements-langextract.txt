@@ -1,0 +1,4 @@
+# For scripts/extract_structured.py — unstructured → structured via LangExtract
+# Install: pip install -r requirements-langextract.txt
+# Requires: LANGEXTRACT_API_KEY (e.g. Gemini) or use Ollama for local models
+langextract>=1.0.0

@@ -1,0 +1,18 @@
+"/Users/dhanushkumar/Desktop/personal/knowledge-cache/KnowledgeCache/Embedding/EmbeddingService.swift":
+  dependencies: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/EmbeddingService.d"
+  swift-dependencies: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/EmbeddingService.swiftdeps"
+  diagnostics: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/EmbeddingService.dia"
+  const-values: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/EmbeddingService.swiftconstvalues"
+  object: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/EmbeddingService.o"
+"/Users/dhanushkumar/Desktop/personal/knowledge-cache/KnowledgeCache/UI/HistoryView.swift":
+  object: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/HistoryView.o"
+  diagnostics: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/HistoryView.dia"
+  swift-dependencies: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/HistoryView.swiftdeps"
+  const-values: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/HistoryView.swiftconstvalues"
+  dependencies: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/HistoryView.d"
+"/Users/dhanushkumar/Desktop/personal/knowledge-cache/KnowledgeCache/Embedding/EmbeddingProviding.swift":
+  dependencies: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/EmbeddingProviding.d"
+  swift-dependencies: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/EmbeddingProviding.swiftdeps"
+  diagnostics: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/EmbeddingProviding.dia"
+  const-values: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/EmbeddingProviding.swiftconstvalues"
+  object: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/EmbeddingProviding.o"

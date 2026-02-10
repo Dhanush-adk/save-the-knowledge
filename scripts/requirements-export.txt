@@ -1,0 +1,6 @@
+# Export environment for EmbeddingModel.mlmodel and minilm_vocab.txt
+# Use Python 3.9–3.11 for best Core ML compatibility (e.g. pyenv install 3.11, then pyenv local 3.11)
+torch>=2.0,<2.4
+transformers>=4.30
+coremltools>=7.0,<8.0
+numpy<2.0

@@ -1,0 +1,18 @@
+"/Users/dhanushkumar/Desktop/personal/knowledge-cache/KnowledgeCache/Answering/AnswerGenerator.swift":
+  dependencies: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/AnswerGenerator.d"
+  diagnostics: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/AnswerGenerator.dia"
+  const-values: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/AnswerGenerator.swiftconstvalues"
+  swift-dependencies: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/AnswerGenerator.swiftdeps"
+  object: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/AnswerGenerator.o"
+"/Users/dhanushkumar/Desktop/personal/knowledge-cache/KnowledgeCache/Models/AnswerWithSources.swift":
+  diagnostics: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/AnswerWithSources.dia"
+  const-values: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/AnswerWithSources.swiftconstvalues"
+  object: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/AnswerWithSources.o"
+  swift-dependencies: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/AnswerWithSources.swiftdeps"
+  dependencies: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/AnswerWithSources.d"
+"/Users/dhanushkumar/Desktop/personal/knowledge-cache/KnowledgeCache/App/AppLogger.swift":
+  object: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/AppLogger.o"
+  swift-dependencies: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/AppLogger.swiftdeps"
+  dependencies: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/AppLogger.d"
+  diagnostics: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/AppLogger.dia"
+  const-values: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/AppLogger.swiftconstvalues"

@@ -1,0 +1,18 @@
+"/Users/dhanushkumar/Desktop/personal/knowledge-cache/KnowledgeCache/Storage/ReindexController.swift":
+  swift-dependencies: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/ReindexController.swiftdeps"
+  object: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/ReindexController.o"
+  const-values: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/ReindexController.swiftconstvalues"
+  diagnostics: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/ReindexController.dia"
+  dependencies: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/ReindexController.d"
+"/Users/dhanushkumar/Desktop/personal/knowledge-cache/KnowledgeCache/UI/SaveView.swift":
+  swift-dependencies: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/SaveView.swiftdeps"
+  diagnostics: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/SaveView.dia"
+  object: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/SaveView.o"
+  dependencies: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/SaveView.d"
+  const-values: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/SaveView.swiftconstvalues"
+"/Users/dhanushkumar/Desktop/personal/knowledge-cache/KnowledgeCache/Retrieval/RetrievalResult.swift":
+  object: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/RetrievalResult.o"
+  swift-dependencies: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/RetrievalResult.swiftdeps"
+  dependencies: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/RetrievalResult.d"
+  diagnostics: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/RetrievalResult.dia"
+  const-values: "/Users/dhanushkumar/Desktop/personal/knowledge-cache/build/Build/Intermediates.noindex/KnowledgeCache.build/Debug/KnowledgeCache.build/Objects-normal/arm64/RetrievalResult.swiftconstvalues"
