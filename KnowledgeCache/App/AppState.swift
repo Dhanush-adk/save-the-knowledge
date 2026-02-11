@@ -16,6 +16,8 @@ final class AppState: ObservableObject {
     let pipeline: IngestionPipeline
     let search: SemanticSearch
     let reindexController: ReindexController
+    let networkMonitor: NetworkMonitor
+    let feedbackReporter: FeedbackReporter
 
     @Published var savedItems: [KnowledgeItem] = []
     @Published var reindexInProgress = false
@@ -42,6 +44,21 @@ final class AppState: ObservableObject {
         self.pipeline = IngestionPipeline(store: store, embedding: embedding, structuredExtractionScriptURL: structuredScriptURL)
         self.search = SemanticSearch(store: store, embedding: embedding)
         self.reindexController = ReindexController(store: store, embedding: embedding)
+        self.networkMonitor = NetworkMonitor()
+        let pendingStore = PendingFeedbackStore()
+        self.feedbackReporter = FeedbackReporter(pendingStore: pendingStore)
+        networkMonitor.onBecameConnected = { [weak self] in
+            Task { @MainActor in
+                self?.feedbackReporter.flushPendingFeedback(isConnected: self?.networkMonitor.isConnected ?? false)
+            }
+        }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            let connected = networkMonitor.isConnected
+            AppLogger.info("Feedback: initial flush check connected=\(connected)")
+            feedbackReporter.flushPendingFeedback(isConnected: connected)
+            feedbackReporter.sendAnalyticsIfNeeded(savesCount: (try? store.fetchAllItems())?.count ?? 0, isConnected: connected)
+        }
         AppLogger.info("App started; embedding available=\(embedding.isAvailable)")
     }
 
@@ -84,5 +101,28 @@ final class AppState: ObservableObject {
 
     func itemExists(id: UUID) -> Bool {
         (try? store.itemExists(id: id)) ?? false
+    }
+
+    /// Save a URL to the offline knowledge base (embed + index). Used by Web tab "Save to offline".
+    func saveURLToOffline(_ url: URL) {
+        saveError = nil
+        saveSuccess = nil
+        isSaveInProgress = true
+        let pipeline = pipeline
+        Task.detached(priority: .userInitiated) {
+            do {
+                let item = try await pipeline.ingest(url: url)
+                await MainActor.run {
+                    self.refreshItems()
+                    self.isSaveInProgress = false
+                    self.saveSuccess = "Saved: \(item.title)"
+                }
+            } catch {
+                await MainActor.run {
+                    self.saveError = error.localizedDescription
+                    self.isSaveInProgress = false
+                }
+            }
+        }
     }
 }

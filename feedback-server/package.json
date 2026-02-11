@@ -1,0 +1,8 @@
+{
+  "name": "knowledge-cache-feedback",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@vercel/blob": "^2.2.0"
+  }
+}

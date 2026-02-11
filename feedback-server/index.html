@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Knowledge Cache – Feedback &amp; Analytics</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 24px; background: #0f0f0f; color: #e0e0e0; }
+    h1 { font-size: 1.5rem; margin-bottom: 8px; }
+    .sub { color: #888; font-size: 0.9rem; margin-bottom: 24px; }
+    section { margin-bottom: 32px; }
+    section h2 { font-size: 1.1rem; color: #aaa; margin-bottom: 12px; }
+    table { width: 100%; border-collapse: collapse; background: #1a1a1a; border-radius: 8px; overflow: hidden; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #2a2a2a; }
+    th { color: #888; font-weight: 600; }
+    tr:last-child td { border-bottom: none; }
+    .card { background: #1a1a1a; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+    .card .time { color: #666; font-size: 0.85rem; }
+    .card .message { margin-top: 6px; }
+    .refresh { margin-bottom: 16px; }
+    .refresh button { padding: 8px 14px; background: #333; color: #e0e0e0; border: 1px solid #444; border-radius: 6px; cursor: pointer; }
+    .refresh button:hover { background: #444; }
+    .empty { color: #666; font-style: italic; }
+    .error { color: #e66; }
+  </style>
+</head>
+<body>
+  <h1>Knowledge Cache – Feedback &amp; Analytics</h1>
+  <p class="sub">Minimal analytics and feedback from the app. Data is stored in Vercel Blob (add a Blob store in the project to persist).</p>
+
+  <div class="refresh">
+    <button type="button" id="refresh">Refresh</button>
+  </div>
+
+  <section>
+    <h2>Analytics (last 200)</h2>
+    <div id="analytics-summary"></div>
+    <table id="analytics-table">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Event</th>
+          <th>App version</th>
+          <th>Saves count</th>
+        </tr>
+      </thead>
+      <tbody id="analytics-body"></tbody>
+    </table>
+    <p id="analytics-empty" class="empty" style="display:none;">No analytics yet.</p>
+  </section>
+
+  <section>
+    <h2>Feedback / Bug reports (last 200)</h2>
+    <div id="feedback-summary"></div>
+    <div id="feedback-list"></div>
+    <p id="feedback-empty" class="empty" style="display:none;">No feedback yet.</p>
+  </section>
+
+  <script>
+    const base = window.location.origin;
+    async function load() {
+      try {
+        const res = await fetch(base + '/api/stats');
+        const data = await res.json();
+        renderAnalytics(data.analytics || []);
+        renderFeedback(data.feedback || []);
+      } catch (e) {
+        document.getElementById('analytics-summary').innerHTML = '<span class="error">Failed to load. Ensure Blob store is connected and redeploy.</span>';
+      }
+    }
+    function renderAnalytics(arr) {
+      const tbody = document.getElementById('analytics-body');
+      const empty = document.getElementById('analytics-empty');
+      const summary = document.getElementById('analytics-summary');
+      summary.textContent = arr.length ? `Total: ${arr.length} event(s)` : '';
+      if (!arr.length) {
+        tbody.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      tbody.innerHTML = arr.map((a) => `
+        <tr>
+          <td>${(a._at || a.timestamp || '—').replace('T', ' ').slice(0, 19)}</td>
+          <td>${a.event || '—'}</td>
+          <td>${a.app_version || '—'}</td>
+          <td>${a.saves_count ?? '—'}</td>
+        </tr>
+      `).join('');
+    }
+    function renderFeedback(arr) {
+      const list = document.getElementById('feedback-list');
+      const empty = document.getElementById('feedback-empty');
+      const summary = document.getElementById('feedback-summary');
+      summary.textContent = arr.length ? `Total: ${arr.length} report(s)` : '';
+      if (!arr.length) {
+        list.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      list.innerHTML = arr.map((f) => `
+        <div class="card">
+          <span class="time">${(f._at || f.timestamp || '—').replace('T', ' ').slice(0, 19)} · ${f.type || 'feedback'} · ${f.app_version || '—'}</span>
+          <div class="message">${escapeHtml(f.message || '')}</div>
+          ${f.email ? `<div class="time">Reply: ${escapeHtml(f.email)}</div>` : ''}
+        </div>
+      `).join('');
+    }
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+    document.getElementById('refresh').addEventListener('click', load);
+    load();
+  </script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+# Build
+build/
+DerivedData/
+
+# Xcode
+*.xcuserstate
+xcuserdata/
+*.moved-aside
+
+# macOS
+.DS_Store
+
+# Python
+venv/
+.venv/
+.venv-export/
+__pycache__/
+*.pyc
+
+# Unnecessary docs (personal/validation notes)
+docs/extracted-adhanushkumar-summary.md
+docs/implementation-notes-from-validation.md
+docs/plan-validation-and-notes.md

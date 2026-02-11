@@ -92,6 +92,11 @@ KnowledgeCache/
 - [docs/implementation-notes-from-validation.md](docs/implementation-notes-from-validation.md) — Chunking, export, entitlements, UX.
 - [docs/embedding-model.md](docs/embedding-model.md) — How to obtain and convert the embedding model (create from template below if missing).
 - [docs/embedding-schema.md](docs/embedding-schema.md) — BLOB layout for embeddings.
+- [docs/feedback-api.md](docs/feedback-api.md) — Backend API for offline-queued feedback and optional minimal analytics.
+
+## Feedback and analytics
+
+In **Settings** you can report bugs or send feedback. When the device is **offline**, reports are stored locally and sent automatically when back **online**. You can host a small backend (see [docs/feedback-api.md](docs/feedback-api.md)) and set its URL in `KnowledgeCache/Feedback/FeedbackConfig.swift`. Optional minimal usage stats (e.g. app version, saves count, once per day) are sent only if enabled in Settings.
 
 ## License
 

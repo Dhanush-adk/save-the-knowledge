@@ -1,2 +1,0 @@
-Target dependency graph (1 target)
-Target 'KnowledgeCache' in project 'KnowledgeCache' (no dependencies)

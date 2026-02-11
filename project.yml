@@ -45,6 +45,7 @@ targets:
     dependencies:
       - sdk: libsqlite3.tbd
       - sdk: WebKit.framework
+      - sdk: Network.framework
   KnowledgeCacheTests:
     type: bundle.unit-test
     platform: macOS

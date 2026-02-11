@@ -20,6 +20,8 @@ struct ContentView: View {
 
     enum Tab: String, CaseIterable {
         case search = "Search"
+        case settings = "Settings"
+        case web = "Web"
         case save = "Save"
         case saved = "Library"
         case history = "History"
@@ -27,9 +29,11 @@ struct ContentView: View {
         var icon: String {
             switch self {
             case .search: return "magnifyingglass"
+            case .web: return "globe"
             case .save: return "plus.circle.fill"
             case .saved: return "books.vertical.fill"
             case .history: return "clock.arrow.circlepath"
+            case .settings: return "gearshape"
             }
         }
     }
@@ -47,12 +51,16 @@ struct ContentView: View {
                 switch selectedTab {
                 case .search:
                     SearchView(app: app)
+                case .web:
+                    WebSearchView(app: app)
                 case .save:
                     SaveView(app: app)
                 case .saved:
                     SavedItemsView(app: app)
                 case .history:
                     HistoryView(app: app)
+                case .settings:
+                    SettingsView(app: app)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
