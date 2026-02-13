@@ -21,3 +21,11 @@ __pycache__/
 docs/extracted-adhanushkumar-summary.md
 docs/implementation-notes-from-validation.md
 docs/plan-validation-and-notes.md
+
+# Keep only docs/README.md committed from root docs/
+docs/*
+!docs/
+!docs/README.md
+
+# Local website-only gitignore file (not part of product repo)
+website/.gitignore

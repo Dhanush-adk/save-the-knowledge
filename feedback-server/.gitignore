@@ -1,2 +1,7 @@
 .vercel
 .env*.local
+
+# Keep only docs/README.md committed from docs/
+docs/*
+!docs/
+!docs/README.md

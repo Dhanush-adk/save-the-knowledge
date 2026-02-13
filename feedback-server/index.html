@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Knowledge Cache – Feedback &amp; Analytics</title>
+  <title>Knowledge Cache – Browser + Analytics</title>
   <style>
     * { box-sizing: border-box; }
     body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 24px; background: #0f0f0f; color: #e0e0e0; }
@@ -21,50 +21,345 @@
     .refresh { margin-bottom: 16px; }
     .refresh button { padding: 8px 14px; background: #333; color: #e0e0e0; border: 1px solid #444; border-radius: 6px; cursor: pointer; }
     .refresh button:hover { background: #444; }
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 8px;
+      margin-bottom: 14px;
+      align-items: end;
+    }
+    .filters label { font-size: 0.8rem; color: #8a8a8a; display: block; margin-bottom: 4px; }
+    .filters input, .filters select, .filters button {
+      width: 100%;
+      border: 1px solid #444;
+      background: #1a1a1a;
+      color: #eee;
+      border-radius: 6px;
+      padding: 8px 10px;
+    }
+    .filters .btn-apply { background: #284c8a; border-color: #3b63a8; cursor: pointer; }
+    .filters .btn-clear { background: #2a2a2a; cursor: pointer; }
     .empty { color: #666; font-style: italic; }
     .error { color: #e66; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+    .tab-btn { padding: 8px 12px; border: 1px solid #444; background: #1a1a1a; color: #ddd; border-radius: 7px; cursor: pointer; }
+    .tab-btn.active { border-color: #5a8dee; color: #5a8dee; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .browser-shell { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 10px; overflow: hidden; }
+    .browser-controls {
+      display: grid;
+      grid-template-columns: auto auto auto 1fr auto;
+      gap: 8px;
+      padding: 10px;
+      border-bottom: 1px solid #2a2a2a;
+      background: #121212;
+    }
+    .browser-controls button,
+    .browser-controls input {
+      border-radius: 6px;
+      border: 1px solid #444;
+      background: #222;
+      color: #eee;
+      padding: 8px 10px;
+    }
+    .browser-controls input { width: 100%; }
+    .browser-controls button { cursor: pointer; }
+    .browser-controls button:hover { background: #2d2d2d; }
+    .browser-note {
+      color: #888;
+      font-size: 0.85rem;
+      padding: 8px 10px;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    iframe#browser-frame {
+      width: 100%;
+      height: 64vh;
+      border: 0;
+      background: #111;
+    }
+    .saved-list { margin-top: 12px; display: grid; gap: 8px; }
+    .saved-row {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .saved-row a { color: #9ec1ff; text-decoration: none; }
+    .saved-row .meta { color: #777; font-size: 0.82rem; margin-top: 4px; }
+    .status-text { color: #9ec1ff; font-size: 0.9rem; margin-top: 8px; min-height: 20px; }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .kpi-card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .kpi-label { color: #8a8a8a; font-size: 0.8rem; }
+    .kpi-value { font-size: 1.25rem; font-weight: 600; margin-top: 4px; }
+    .export-links { display: flex; gap: 10px; margin: 8px 0 12px; }
+    .export-links a { color: #9ec1ff; text-decoration: none; font-size: 0.9rem; }
+    .alert-list { display: grid; gap: 8px; margin-top: 10px; }
+    .alert-item {
+      border: 1px solid #3b3b3b;
+      background: #181818;
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .alert-item.high { border-color: #8a3a3a; }
+    .alert-item.medium { border-color: #8a6f3a; }
+    .alert-title { font-weight: 600; }
+    .alert-meta { color: #949494; font-size: 0.82rem; margin-top: 3px; }
   </style>
 </head>
 <body>
-  <h1>Knowledge Cache – Feedback &amp; Analytics</h1>
-  <p class="sub">Minimal analytics and feedback from the app. Data is stored in Vercel Blob (add a Blob store in the project to persist).</p>
+  <h1>Knowledge Cache</h1>
+  <p class="sub">Single-tab browser MVP with Save Offline flow, plus analytics and feedback dashboard.</p>
 
-  <div class="refresh">
-    <button type="button" id="refresh">Refresh</button>
+  <div class="tabs">
+    <button type="button" class="tab-btn active" data-panel="browser-panel">Browser MVP</button>
+    <button type="button" class="tab-btn" data-panel="ops-panel">Ops Dashboard</button>
   </div>
 
-  <section>
-    <h2>Analytics (last 200)</h2>
-    <div id="analytics-summary"></div>
-    <table id="analytics-table">
-      <thead>
-        <tr>
-          <th>Time</th>
-          <th>Event</th>
-          <th>App version</th>
-          <th>Saves count</th>
-        </tr>
-      </thead>
-      <tbody id="analytics-body"></tbody>
-    </table>
-    <p id="analytics-empty" class="empty" style="display:none;">No analytics yet.</p>
-  </section>
+  <div id="browser-panel" class="panel active">
+    <section>
+      <h2>In-App Browser (Single-Tab)</h2>
+      <div class="browser-shell">
+        <div class="browser-controls">
+          <button type="button" id="btn-back" title="Back">Back</button>
+          <button type="button" id="btn-forward" title="Forward">Forward</button>
+          <button type="button" id="btn-reload" title="Reload">Reload</button>
+          <input id="address" type="text" placeholder="Enter URL or search query" />
+          <button type="button" id="btn-save">Save Offline</button>
+        </div>
+        <div class="browser-note">Some sites block iframe embedding. In desktop app webview mode, this limitation can be handled differently.</div>
+        <iframe id="browser-frame" title="Browser frame" src="https://duckduckgo.com"></iframe>
+      </div>
+      <div id="save-status" class="status-text"></div>
+    </section>
 
-  <section>
-    <h2>Feedback / Bug reports (last 200)</h2>
-    <div id="feedback-summary"></div>
-    <div id="feedback-list"></div>
-    <p id="feedback-empty" class="empty" style="display:none;">No feedback yet.</p>
-  </section>
+    <section>
+      <h2>Saved URLs (latest)</h2>
+      <div id="saved-summary"></div>
+      <div id="saved-list" class="saved-list"></div>
+      <p id="saved-empty" class="empty" style="display:none;">No saved URLs yet.</p>
+    </section>
+  </div>
+
+  <div id="ops-panel" class="panel">
+    <div class="refresh">
+      <button type="button" id="refresh">Refresh</button>
+    </div>
+    <section>
+      <h2>Dashboard Filters</h2>
+      <div class="filters">
+        <div>
+          <label for="filter-from">From Date</label>
+          <input id="filter-from" type="date" />
+        </div>
+        <div>
+          <label for="filter-to">To Date</label>
+          <input id="filter-to" type="date" />
+        </div>
+        <div>
+          <label for="filter-install">Install ID</label>
+          <input id="filter-install" type="text" placeholder="install_id" />
+        </div>
+        <div>
+          <label for="filter-event">Event Type</label>
+          <select id="filter-event">
+            <option value="">All events</option>
+            <option value="session_started">session_started</option>
+            <option value="url_saved">url_saved</option>
+            <option value="query_answered">query_answered</option>
+            <option value="feedback_sent">feedback_sent</option>
+          </select>
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <button type="button" class="btn-apply" id="apply-filters">Apply</button>
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <button type="button" class="btn-clear" id="clear-filters">Clear</button>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Investor KPIs</h2>
+      <div id="kpi-grid" class="kpi-grid"></div>
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Events</th>
+            <th>URLs Saved</th>
+            <th>Queries</th>
+            <th>Query Success</th>
+          </tr>
+        </thead>
+        <tbody id="kpi-trend-body"></tbody>
+      </table>
+      <p id="kpi-empty" class="empty" style="display:none;">No KPI trend data yet.</p>
+    </section>
+
+    <section>
+      <h2>Operational Alerts & SLO (24h)</h2>
+      <div id="ops-slo-grid" class="kpi-grid"></div>
+      <div id="ops-alerts" class="alert-list"></div>
+      <p id="ops-alerts-empty" class="empty" style="display:none;">No active alerts.</p>
+    </section>
+
+    <section>
+      <h2>Retention Cohorts</h2>
+      <div class="export-links">
+        <a id="retention-json-link" href="/api/retention-export?format=json" target="_blank" rel="noreferrer noopener">Open JSON</a>
+        <a id="retention-csv-link" href="/api/retention-export?format=csv" target="_blank" rel="noreferrer noopener">Download CSV</a>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Cohort Date</th>
+            <th>Installs</th>
+            <th>D1 Retained</th>
+            <th>D1 Rate</th>
+            <th>D7 Retained</th>
+            <th>D7 Rate</th>
+          </tr>
+        </thead>
+        <tbody id="retention-body"></tbody>
+      </table>
+      <p id="retention-empty" class="empty" style="display:none;">No retention cohort data yet.</p>
+    </section>
+
+    <section>
+      <h2>Analytics (last 200)</h2>
+      <div id="analytics-summary"></div>
+      <table id="analytics-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Event</th>
+            <th>App version</th>
+            <th>Saves count</th>
+          </tr>
+        </thead>
+        <tbody id="analytics-body"></tbody>
+      </table>
+      <p id="analytics-empty" class="empty" style="display:none;">No analytics yet.</p>
+    </section>
+
+    <section>
+      <h2>Feedback / Bug reports (last 200)</h2>
+      <div id="feedback-summary"></div>
+      <div id="feedback-list"></div>
+      <p id="feedback-empty" class="empty" style="display:none;">No feedback yet.</p>
+    </section>
+  </div>
 
   <script>
     const base = window.location.origin;
+    const frame = document.getElementById('browser-frame');
+    const addressInput = document.getElementById('address');
+    const saveStatus = document.getElementById('save-status');
+    const historyState = { stack: [], index: -1 };
+    const filters = {
+      from: '',
+      to: '',
+      install_id: '',
+      event: '',
+    };
+
+    function toUrlOrSearch(input) {
+      const value = (input || '').trim();
+      if (!value) return null;
+      if (/^https?:\/\//i.test(value)) return value;
+      return `https://duckduckgo.com/?q=${encodeURIComponent(value)}`;
+    }
+
+    function navigate(next, push = true) {
+      const finalUrl = toUrlOrSearch(next);
+      if (!finalUrl) return;
+      if (push) {
+        historyState.stack = historyState.stack.slice(0, historyState.index + 1);
+        historyState.stack.push(finalUrl);
+        historyState.index = historyState.stack.length - 1;
+      }
+      frame.src = finalUrl;
+      addressInput.value = finalUrl;
+      saveStatus.textContent = '';
+    }
+
+    function formatTs(value) {
+      if (!value) return '—';
+      return value.replace('T', ' ').slice(0, 19);
+    }
+
+    function setActivePanel(panelId) {
+      document.querySelectorAll('.tab-btn').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.panel === panelId);
+      });
+      document.querySelectorAll('.panel').forEach((panel) => {
+        panel.classList.toggle('active', panel.id === panelId);
+      });
+    }
+
+    async function saveOffline() {
+      const url = toUrlOrSearch(addressInput.value);
+      if (!url) {
+        saveStatus.textContent = 'Enter a URL or search query.';
+        return;
+      }
+      saveStatus.textContent = 'Saving...';
+      try {
+        const res = await fetch(base + '/api/offline-save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url,
+            title: url,
+            source: 'web-shell',
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          saveStatus.textContent = 'Save failed. Check server logs.';
+          return;
+        }
+        saveStatus.textContent = 'Saved for offline indexing queue.';
+        await load();
+      } catch (e) {
+        saveStatus.textContent = 'Save failed. Network/server error.';
+      }
+    }
+
     async function load() {
       try {
-        const res = await fetch(base + '/api/stats');
-        const data = await res.json();
+        const params = new URLSearchParams();
+        if (filters.from) params.set('from', filters.from);
+        if (filters.to) params.set('to', filters.to);
+        if (filters.install_id) params.set('install_id', filters.install_id);
+        if (filters.event) params.set('event', filters.event);
+        const q = params.toString() ? `?${params.toString()}` : '';
+        updateRetentionExportLinks();
+
+        const [statsRes, retentionRes] = await Promise.all([
+          fetch(base + '/api/stats' + q),
+          fetch(base + '/api/retention-export?format=json' + (q ? `&${q.slice(1)}` : '')),
+        ]);
+        const data = await statsRes.json();
+        const retentionData = retentionRes.ok ? await retentionRes.json() : { cohorts: [] };
+        renderKpis(data.kpis || {});
         renderAnalytics(data.analytics || []);
         renderFeedback(data.feedback || []);
+        renderSavedUrls(data.saved_urls || []);
+        renderRetentionCohorts(retentionData.cohorts || []);
       } catch (e) {
         document.getElementById('analytics-summary').innerHTML = '<span class="error">Failed to load. Ensure Blob store is connected and redeploy.</span>';
       }
@@ -82,11 +377,104 @@
       empty.style.display = 'none';
       tbody.innerHTML = arr.map((a) => `
         <tr>
-          <td>${(a._at || a.timestamp || '—').replace('T', ' ').slice(0, 19)}</td>
+          <td>${formatTs(a._at || a.timestamp || '—')}</td>
           <td>${a.event || '—'}</td>
           <td>${a.app_version || '—'}</td>
           <td>${a.saves_count ?? '—'}</td>
         </tr>
+      `).join('');
+    }
+    function fmtNum(v) {
+      if (v === null || v === undefined || Number.isNaN(v)) return '—';
+      return Number(v).toLocaleString();
+    }
+    function fmtPct(v) {
+      if (v === null || v === undefined || Number.isNaN(v)) return '—';
+      return `${(Number(v) * 100).toFixed(1)}%`;
+    }
+    function renderKpis(kpis) {
+      const summary = kpis.summary || {};
+      const grid = document.getElementById('kpi-grid');
+      const trendBody = document.getElementById('kpi-trend-body');
+      const empty = document.getElementById('kpi-empty');
+      const cards = [
+        ['Unique Installs', fmtNum(summary.unique_installs)],
+        ['Activated Installs', fmtNum(summary.activated_installs)],
+        ['URL Saves', fmtNum(summary.urls_saved_events)],
+        ['Query Success Rate', fmtPct(summary.query_success_rate)],
+        ['Query p95 (ms)', fmtNum(summary.query_latency_p95_ms)],
+        ['Raw Bytes', fmtNum(summary.raw_bytes_total)],
+        ['Stored Bytes', fmtNum(summary.stored_bytes_total)],
+        ['Storage Saved %', summary.storage_saved_pct == null ? '—' : `${Number(summary.storage_saved_pct).toFixed(1)}%`],
+        ['D1 Retention', fmtPct(summary.d1_retention_rate)],
+        ['D7 Retention', fmtPct(summary.d7_retention_rate)],
+      ];
+      grid.innerHTML = cards.map(([label, value]) => `
+        <div class="kpi-card">
+          <div class="kpi-label">${label}</div>
+          <div class="kpi-value">${value}</div>
+        </div>
+      `).join('');
+      renderOpsSignals(kpis.ops || {});
+      const trend = Array.isArray(kpis.daily_trend) ? kpis.daily_trend : [];
+      if (!trend.length) {
+        trendBody.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      trendBody.innerHTML = trend.map((d) => `
+        <tr>
+          <td>${d.date || '—'}</td>
+          <td>${fmtNum(d.events)}</td>
+          <td>${fmtNum(d.urls_saved)}</td>
+          <td>${fmtNum(d.queries)}</td>
+          <td>${fmtNum(d.query_success)}</td>
+        </tr>
+      `).join('');
+    }
+    function fmtOpsValue(value, key) {
+      if (value === null || value === undefined || Number.isNaN(value)) return '—';
+      if (key.includes('rate')) return `${(Number(value) * 100).toFixed(1)}%`;
+      return Number(value).toLocaleString();
+    }
+    function renderOpsSignals(ops) {
+      const slo = ops.slo || {};
+      const alerts = Array.isArray(ops.alerts) ? ops.alerts : [];
+      const sloGrid = document.getElementById('ops-slo-grid');
+      const alertList = document.getElementById('ops-alerts');
+      const empty = document.getElementById('ops-alerts-empty');
+
+      const cards = [
+        ['Query Success 24h', fmtOpsValue(slo.query_success_rate_24h, 'query_success_rate_24h')],
+        ['Query p95 ms 24h', fmtOpsValue(slo.query_latency_p95_ms_24h, 'query_latency_p95_ms_24h')],
+        ['Max Queue Size 24h', fmtOpsValue(slo.pending_queue_size_max_24h, 'pending_queue_size_max_24h')],
+        ['Oldest Queue Age (s)', fmtOpsValue(slo.oldest_pending_age_seconds_max_24h, 'oldest_pending_age_seconds_max_24h')],
+        ['Flush Success 24h', fmtOpsValue(slo.flush_success_rate_24h, 'flush_success_rate_24h')],
+        ['Sync Error 24h', fmtOpsValue(slo.sync_error_rate_24h, 'sync_error_rate_24h')],
+      ];
+      sloGrid.innerHTML = cards.map(([label, value]) => `
+        <div class="kpi-card">
+          <div class="kpi-label">${label}</div>
+          <div class="kpi-value">${value}</div>
+        </div>
+      `).join('');
+
+      if (!alerts.length) {
+        alertList.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      alertList.innerHTML = alerts.map((a) => `
+        <div class="alert-item ${a.severity || ''}">
+          <div class="alert-title">${a.title || a.key || 'Alert'}</div>
+          <div class="alert-meta">
+            severity=${a.severity || 'n/a'} · value=${fmtOpsValue(a.value, a.key || '')}
+            · threshold ${a.comparator || ''} ${fmtOpsValue(a.threshold, a.key || '')}
+            · window=${a.window || 'n/a'}
+          </div>
+        </div>
       `).join('');
     }
     function renderFeedback(arr) {
@@ -102,9 +490,60 @@
       empty.style.display = 'none';
       list.innerHTML = arr.map((f) => `
         <div class="card">
-          <span class="time">${(f._at || f.timestamp || '—').replace('T', ' ').slice(0, 19)} · ${f.type || 'feedback'} · ${f.app_version || '—'}</span>
+          <span class="time">${formatTs(f._at || f.timestamp || '—')} · ${f.type || 'feedback'} · ${f.app_version || '—'}</span>
           <div class="message">${escapeHtml(f.message || '')}</div>
           ${f.email ? `<div class="time">Reply: ${escapeHtml(f.email)}</div>` : ''}
+        </div>
+      `).join('');
+    }
+    function renderRetentionCohorts(cohorts) {
+      const body = document.getElementById('retention-body');
+      const empty = document.getElementById('retention-empty');
+      if (!Array.isArray(cohorts) || !cohorts.length) {
+        body.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      body.innerHTML = cohorts.map((r) => `
+        <tr>
+          <td>${r.cohort_date || '—'}</td>
+          <td>${fmtNum(r.cohort_size)}</td>
+          <td>${fmtNum(r.d1_retained)}</td>
+          <td>${fmtPct(r.d1_retention_rate)}</td>
+          <td>${fmtNum(r.d7_retained)}</td>
+          <td>${fmtPct(r.d7_retention_rate)}</td>
+        </tr>
+      `).join('');
+    }
+    function updateRetentionExportLinks() {
+      const params = new URLSearchParams();
+      if (filters.from) params.set('from', filters.from);
+      if (filters.to) params.set('to', filters.to);
+      if (filters.install_id) params.set('install_id', filters.install_id);
+      if (filters.event) params.set('event', filters.event);
+      const jsonParams = new URLSearchParams(params);
+      jsonParams.set('format', 'json');
+      const csvParams = new URLSearchParams(params);
+      csvParams.set('format', 'csv');
+      document.getElementById('retention-json-link').href = `/api/retention-export?${jsonParams.toString()}`;
+      document.getElementById('retention-csv-link').href = `/api/retention-export?${csvParams.toString()}`;
+    }
+    function renderSavedUrls(arr) {
+      const list = document.getElementById('saved-list');
+      const empty = document.getElementById('saved-empty');
+      const summary = document.getElementById('saved-summary');
+      summary.textContent = arr.length ? `Total saved: ${arr.length}` : '';
+      if (!arr.length) {
+        list.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      list.innerHTML = arr.slice(0, 20).map((s) => `
+        <div class="saved-row">
+          <a href="${escapeHtml(s.url || '#')}" target="_blank" rel="noreferrer noopener">${escapeHtml(s.title || s.url || 'Untitled')}</a>
+          <div class="meta">${formatTs(s._at || '—')} · ${escapeHtml(s.source || 'browser')}</div>
         </div>
       `).join('');
     }
@@ -113,7 +552,47 @@
       div.textContent = s;
       return div.innerHTML;
     }
+
+    addressInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') navigate(addressInput.value);
+    });
+    document.getElementById('btn-reload').addEventListener('click', () => navigate(addressInput.value, false));
+    document.getElementById('btn-back').addEventListener('click', () => {
+      if (historyState.index > 0) {
+        historyState.index -= 1;
+        navigate(historyState.stack[historyState.index], false);
+      }
+    });
+    document.getElementById('btn-forward').addEventListener('click', () => {
+      if (historyState.index < historyState.stack.length - 1) {
+        historyState.index += 1;
+        navigate(historyState.stack[historyState.index], false);
+      }
+    });
+    document.getElementById('btn-save').addEventListener('click', saveOffline);
+    document.querySelectorAll('.tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => setActivePanel(btn.dataset.panel));
+    });
     document.getElementById('refresh').addEventListener('click', load);
+    document.getElementById('apply-filters').addEventListener('click', () => {
+      filters.from = document.getElementById('filter-from').value || '';
+      filters.to = document.getElementById('filter-to').value || '';
+      filters.install_id = (document.getElementById('filter-install').value || '').trim();
+      filters.event = document.getElementById('filter-event').value || '';
+      load();
+    });
+    document.getElementById('clear-filters').addEventListener('click', () => {
+      filters.from = '';
+      filters.to = '';
+      filters.install_id = '';
+      filters.event = '';
+      document.getElementById('filter-from').value = '';
+      document.getElementById('filter-to').value = '';
+      document.getElementById('filter-install').value = '';
+      document.getElementById('filter-event').value = '';
+      load();
+    });
+    navigate('https://duckduckgo.com');
     load();
   </script>
 </body>

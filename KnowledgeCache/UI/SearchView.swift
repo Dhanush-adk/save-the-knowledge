@@ -179,6 +179,7 @@ struct SearchView: View {
     private func runSearch() {
         let q = query.trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty else { return }
+        let startedAt = Date()
         app.searchError = nil
         app.lastAnswer = nil
         app.searchInProgress = true
@@ -192,6 +193,8 @@ struct SearchView: View {
                     showReindexRequired = true
                     app.lastAnswer = nil
                     app.searchInProgress = false
+                    let latencyMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+                    app.trackQuery(question: q, success: false, latencyMs: latencyMs)
                 }
             case .results(let results):
                 let answer = await AnswerGenerator.generateWithOllama(results: results, query: q)
@@ -207,6 +210,9 @@ struct SearchView: View {
                     app.lastAnswer = answer
                     app.searchInProgress = false
                     app.refreshHistory()
+                    let latencyMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+                    let success = !answer.sources.isEmpty && !answer.answerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    app.trackQuery(question: q, success: success, latencyMs: latencyMs)
                 }
             }
         }

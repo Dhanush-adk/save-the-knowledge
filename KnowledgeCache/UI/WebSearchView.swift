@@ -10,32 +10,55 @@ import SwiftUI
 import WebKit
 
 // MARK: - Web Search View
+private struct BrowserTab: Identifiable, Equatable {
+    let id: UUID
+    var title: String
+    var currentURL: URL?
+    var pendingLoadURL: URL?
+    var isLoading: Bool
+
+    init(initialURL: URL) {
+        self.id = UUID()
+        self.title = "New Tab"
+        self.currentURL = initialURL
+        self.pendingLoadURL = initialURL
+        self.isLoading = false
+    }
+}
 
 struct WebSearchView: View {
     @ObservedObject var app: AppState
     @State private var searchOrURL = ""
-    @State private var currentURL: URL?
-    @State private var isLoading = false
     @State private var saveSuccessVisible = false
-    @State private var urlToLoad: URL?
     @State private var hasLoadedInitial = false
+    @State private var tabs: [BrowserTab] = []
+    @State private var selectedTabID: UUID?
     @FocusState private var isSearchFocused: Bool
 
     private static let duckDuckGoBase = "https://duckduckgo.com/"
     private static let searchEngineHosts = ["duckduckgo.com", "google.com", "bing.com", "www.duckduckgo.com", "www.google.com", "www.bing.com"]
+    private var initialURL: URL { URL(string: Self.duckDuckGoBase)! }
 
     var body: some View {
         VStack(spacing: 0) {
+            tabStrip
             toolbar
-            if app.isSaveInProgress || app.saveError != nil || saveSuccessVisible {
+            if app.isSaveInProgress || app.saveError != nil || saveSuccessVisible || app.saveJobState != .idle {
                 saveStatusBanner
             }
             Divider()
-            BrowserWebView(
-                urlToLoad: $urlToLoad,
-                currentURL: $currentURL,
-                isLoading: $isLoading
-            )
+            ZStack {
+                ForEach(tabs) { tab in
+                    BrowserWebView(
+                        urlToLoad: binding(for: tab.id, keyPath: \.pendingLoadURL),
+                        currentURL: binding(for: tab.id, keyPath: \.currentURL),
+                        isLoading: binding(for: tab.id, keyPath: \.isLoading),
+                        pageTitle: binding(for: tab.id, keyPath: \.title)
+                    )
+                    .opacity(tab.id == selectedTabID ? 1 : 0)
+                    .allowsHitTesting(tab.id == selectedTabID)
+                }
+            }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .onChange(of: app.saveSuccess) { _, newValue in
@@ -53,9 +76,66 @@ struct WebSearchView: View {
         .onAppear {
             if !hasLoadedInitial {
                 hasLoadedInitial = true
-                urlToLoad = URL(string: Self.duckDuckGoBase)
+                let first = BrowserTab(initialURL: initialURL)
+                tabs = [first]
+                selectedTabID = first.id
+                searchOrURL = initialURL.absoluteString
             }
         }
+        .onChange(of: selectedTabID) { _, newID in
+            guard let id = newID, let idx = tabs.firstIndex(where: { $0.id == id }) else { return }
+            searchOrURL = tabs[idx].currentURL?.absoluteString ?? ""
+        }
+        .onChange(of: tabs) { _, _ in
+            guard let tab = selectedTab else { return }
+            if let u = tab.currentURL {
+                searchOrURL = u.absoluteString
+            }
+        }
+    }
+
+    private var tabStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(tabs) { tab in
+                    HStack(spacing: 6) {
+                        Button(action: { selectedTabID = tab.id }) {
+                            Text(tabLabel(tab))
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                                .frame(maxWidth: 180, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
+
+                        if tabs.count > 1 {
+                            Button(action: { closeTab(tab.id) }) {
+                                Image(systemName: "xmark")
+                                    .font(.caption2)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Close tab")
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background((tab.id == selectedTabID ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.12)))
+                    .clipShape(RoundedRectangle(cornerRadius: 7))
+                }
+
+                Button(action: newTab) {
+                    Image(systemName: "plus")
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(Color.secondary.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 7))
+                .help("New tab")
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+        }
+        .background(.regularMaterial)
     }
 
     private var toolbar: some View {
@@ -119,13 +199,28 @@ struct WebSearchView: View {
 
     private var saveStatusBanner: some View {
         Group {
-            if app.isSaveInProgress {
+            if case .queued = app.saveJobState {
                 HStack(spacing: 12) {
                     ProgressView().scaleEffect(0.9)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Saving to offline…")
+                        Text("Queued for offline save…")
                             .font(.subheadline.weight(.medium))
-                        Text("Extracting and indexing. This may take 10–30 seconds.")
+                        Text("Preparing page extraction job.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.accentColor.opacity(0.12))
+            } else if case .indexing = app.saveJobState {
+                HStack(spacing: 12) {
+                    ProgressView().scaleEffect(0.9)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Indexing for offline search…")
+                            .font(.subheadline.weight(.medium))
+                        Text("Extracting, chunking, and embedding. This may take 10–30 seconds.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -163,7 +258,7 @@ struct WebSearchView: View {
     }
 
     private var canSaveCurrentPage: Bool {
-        guard let url = currentURL else { return false }
+        guard let url = selectedTab?.currentURL else { return false }
         guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return false }
         guard let host = url.host?.lowercased() else { return false }
         return !Self.searchEngineHosts.contains(host)
@@ -172,16 +267,17 @@ struct WebSearchView: View {
     private func loadSearchOrURL() {
         let input = searchOrURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !input.isEmpty else { return }
+        guard let idx = selectedTabIndex else { return }
         if let url = parseAsURL(input) {
-            urlToLoad = url
-            currentURL = url
+            tabs[idx].pendingLoadURL = url
+            tabs[idx].currentURL = url
         } else {
             var allowed = CharacterSet.urlQueryAllowed
             allowed.remove(charactersIn: " ")
             let query = input.addingPercentEncoding(withAllowedCharacters: allowed) ?? input
             let searchURL = URL(string: Self.duckDuckGoBase + "?q=" + query)!
-            urlToLoad = searchURL
-            currentURL = searchURL
+            tabs[idx].pendingLoadURL = searchURL
+            tabs[idx].currentURL = searchURL
         }
     }
 
@@ -209,9 +305,64 @@ struct WebSearchView: View {
     }
 
     private func saveCurrentPageToOffline() {
-        guard let url = currentURL, canSaveCurrentPage else { return }
+        guard let url = selectedTab?.currentURL, canSaveCurrentPage else { return }
         app.saveError = nil
+        app.saveJobState = .queued(url)
         app.saveURLToOffline(url)
+    }
+
+    private var selectedTabIndex: Int? {
+        guard let id = selectedTabID else { return nil }
+        return tabs.firstIndex(where: { $0.id == id })
+    }
+
+    private var selectedTab: BrowserTab? {
+        guard let idx = selectedTabIndex, tabs.indices.contains(idx) else { return nil }
+        return tabs[idx]
+    }
+
+    private func newTab() {
+        let tab = BrowserTab(initialURL: initialURL)
+        tabs.append(tab)
+        selectedTabID = tab.id
+        searchOrURL = initialURL.absoluteString
+    }
+
+    private func closeTab(_ id: UUID) {
+        tabs.removeAll { $0.id == id }
+        if tabs.isEmpty {
+            let tab = BrowserTab(initialURL: initialURL)
+            tabs = [tab]
+            selectedTabID = tab.id
+            searchOrURL = initialURL.absoluteString
+            return
+        }
+        if selectedTabID == id {
+            selectedTabID = tabs.last?.id
+        }
+    }
+
+    private func tabLabel(_ tab: BrowserTab) -> String {
+        if tab.isLoading { return "Loading..." }
+        if !tab.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, tab.title != "New Tab" {
+            return tab.title
+        }
+        return tab.currentURL?.host ?? "New Tab"
+    }
+
+    private func binding<Value>(for tabID: UUID, keyPath: WritableKeyPath<BrowserTab, Value>) -> Binding<Value> {
+        Binding(
+            get: {
+                guard let idx = tabs.firstIndex(where: { $0.id == tabID }) else {
+                    return BrowserTab(initialURL: initialURL)[keyPath: keyPath]
+                }
+                return tabs[idx][keyPath: keyPath]
+            },
+            set: { newValue in
+                guard let idx = tabs.firstIndex(where: { $0.id == tabID }) else { return }
+                tabs[idx][keyPath: keyPath] = newValue
+            }
+        )
     }
 }
 
@@ -227,6 +378,7 @@ struct BrowserWebView: NSViewRepresentable {
     @Binding var urlToLoad: URL?
     @Binding var currentURL: URL?
     @Binding var isLoading: Bool
+    @Binding var pageTitle: String
 
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
@@ -249,18 +401,20 @@ struct BrowserWebView: NSViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(currentURL: $currentURL, isLoading: $isLoading)
+        Coordinator(currentURL: $currentURL, isLoading: $isLoading, pageTitle: $pageTitle)
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate {
         @Binding var currentURL: URL?
         @Binding var isLoading: Bool
+        @Binding var pageTitle: String
         weak var webView: WKWebView?
         var pendingURL: URL?
 
-        init(currentURL: Binding<URL?>, isLoading: Binding<Bool>) {
+        init(currentURL: Binding<URL?>, isLoading: Binding<Bool>, pageTitle: Binding<String>) {
             _currentURL = currentURL
             _isLoading = isLoading
+            _pageTitle = pageTitle
         }
 
         func setupNotifications() {
@@ -305,6 +459,7 @@ struct BrowserWebView: NSViewRepresentable {
             isLoading = false
             let url = webView.url
             currentURL = url
+            pageTitle = webView.title ?? url?.host ?? "New Tab"
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {

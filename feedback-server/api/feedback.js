@@ -1,12 +1,17 @@
 const { appendFeedback } = require('../lib/store');
+const { requireApiKey, checkRateLimit, enforceIdempotency, idempotencyKeyFrom } = require('../lib/security');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     res.status(405).end();
     return;
   }
+  if (!requireApiKey(req, res)) return;
+  if (!(await checkRateLimit(req, res, 'feedback', 120))) return;
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
+    const idemKey = idempotencyKeyFrom(req, body, 'feedback');
+    if (!(await enforceIdempotency(res, idemKey))) return;
     const { id, message, email, type, app_version, os_version, timestamp } = body;
     const payload = { id, message, email, type, app_version, os_version, timestamp };
     console.log('[feedback]', JSON.stringify(payload));

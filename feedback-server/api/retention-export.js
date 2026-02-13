@@ -1,5 +1,5 @@
 const { readData } = require('../lib/store');
-const { computeInvestorKpis } = require('../lib/kpis');
+const { generateRetentionCohorts, retentionCohortsToCsv } = require('../lib/kpis');
 
 function parseDateInput(raw, endOfDay = false) {
   if (!raw || typeof raw !== 'string') return null;
@@ -33,6 +33,8 @@ module.exports = async (req, res) => {
   }
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    const format = (url.searchParams.get('format') || 'json').toLowerCase();
+    const safeFormat = format === 'csv' ? 'csv' : 'json';
     const from = parseDateInput(url.searchParams.get('from'), false);
     const to = parseDateInput(url.searchParams.get('to'), true);
     const installId = (url.searchParams.get('install_id') || '').trim();
@@ -46,36 +48,23 @@ module.exports = async (req, res) => {
       if (event && entry.event !== event) return false;
       return true;
     });
-    const feedback = (data.feedback || []).filter((entry) => withinRange(parseTs(entry), from, to));
-    const savedUrls = (data.saved_urls || []).filter((entry) => withinRange(parseTs(entry), from, to));
-
-    data.analytics = analytics;
-    data.feedback = feedback;
-    data.saved_urls = savedUrls;
-    data.kpis = computeInvestorKpis(analytics);
-    data.filters = {
-      from: from ? from.toISOString() : null,
-      to: to ? to.toISOString() : null,
-      install_id: installId || null,
-      event: event || null,
-    };
+    const exportData = generateRetentionCohorts(analytics);
 
     res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
-    res.status(200).json(data);
+    if (safeFormat === 'csv') {
+      const csv = retentionCohortsToCsv(exportData);
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="retention-cohorts.csv"');
+      res.status(200).send(csv);
+      return;
+    }
+
+    res.status(200).json(exportData);
   } catch (e) {
-    console.error('[stats]', e);
+    console.error('[retention-export]', e);
     res.status(200).json({
-      analytics: [],
-      feedback: [],
-      saved_urls: [],
-      kpis: {
-        summary: {},
-        funnel: {},
-        daily_trend: [],
-        retention: {},
-        ops: { generated_at: new Date().toISOString(), window_hours: 24, slo: {}, alerts: [] },
-      },
-      filters: { from: null, to: null, install_id: null, event: null },
+      generated_at: new Date().toISOString(),
+      cohorts: [],
     });
   }
 };

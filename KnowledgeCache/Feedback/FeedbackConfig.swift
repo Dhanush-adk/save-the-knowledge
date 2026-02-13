@@ -14,7 +14,8 @@ enum FeedbackConfig {
     /// → set to "Only Preview Deployments" so production is public. See feedback-server/FIX-401.md.
     /// Set to empty string to disable sending (feedback will still be queued offline).
     static var baseURL: String {
-        "https://feedback-server-entlpfvs5-dhanushs-projects-acfd41f9.vercel.app"
+        // "https://feedback-server-entlpfvs5-dhanushs-projects-acfd41f9.vercel.app"
+        "http://localhost:3000"
     }
 
     /// Optional: Vercel "Protection Bypass for Automation" secret. If set, sent as

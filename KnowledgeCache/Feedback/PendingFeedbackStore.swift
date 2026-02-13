@@ -67,8 +67,28 @@ final class PendingFeedbackStore {
         }
     }
 
+    func synchronouslyQueueMetrics(now: Date = Date()) -> (count: Int, oldestPendingAgeSeconds: Int) {
+        queue.sync {
+            let list = load()
+            let oldest = list
+                .compactMap { Self.parseTimestamp($0.timestamp) }
+                .min()
+            let age = oldest.map { max(0, Int(now.timeIntervalSince($0))) } ?? 0
+            return (list.count, age)
+        }
+    }
+
     private func save(_ list: [FeedbackItem]) {
         guard let data = try? JSONEncoder().encode(list) else { return }
         try? data.write(to: fileURL)
+    }
+
+    private static func parseTimestamp(_ raw: String) -> Date? {
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = fractional.date(from: raw) { return d }
+        let plain = ISO8601DateFormatter()
+        plain.formatOptions = [.withInternetDateTime]
+        return plain.date(from: raw)
     }
 }

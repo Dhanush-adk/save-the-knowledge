@@ -9,6 +9,13 @@ import Foundation
 import SQLite3
 
 final class KnowledgeStore: @unchecked Sendable {
+    struct StorageTotals {
+        let itemsCount: Int
+        let chunksCount: Int
+        let rawBytesTotal: Int
+        let storedBytesTotal: Int
+    }
+
     private let db: Database
 
     init(db: Database) {
@@ -186,6 +193,35 @@ final class KnowledgeStore: @unchecked Sendable {
 
     func optimizeStorage() throws {
         try db.optimizeStorage()
+    }
+
+    func fetchStorageTotals() throws -> StorageTotals {
+        let itemsStmt = try db.prepare("SELECT COUNT(*), COALESCE(SUM(LENGTH(raw_content)), 0) FROM knowledge_items")
+        defer { sqlite3_finalize(itemsStmt) }
+        let chunksStmt = try db.prepare("SELECT COUNT(*), COALESCE(SUM(LENGTH(text) + LENGTH(embedding_blob)), 0) FROM chunks")
+        defer { sqlite3_finalize(chunksStmt) }
+
+        var itemsCount = 0
+        var rawBytes = 0
+        if sqlite3_step(itemsStmt) == SQLITE_ROW {
+            itemsCount = Int(sqlite3_column_int64(itemsStmt, 0))
+            rawBytes = Int(sqlite3_column_int64(itemsStmt, 1))
+        }
+
+        var chunksCount = 0
+        var chunkStoredBytes = 0
+        if sqlite3_step(chunksStmt) == SQLITE_ROW {
+            chunksCount = Int(sqlite3_column_int64(chunksStmt, 0))
+            chunkStoredBytes = Int(sqlite3_column_int64(chunksStmt, 1))
+        }
+
+        let storedBytesTotal = rawBytes + chunkStoredBytes
+        return StorageTotals(
+            itemsCount: itemsCount,
+            chunksCount: chunksCount,
+            rawBytesTotal: rawBytes,
+            storedBytesTotal: storedBytesTotal
+        )
     }
 
     func fetchItem(id: UUID) throws -> KnowledgeItem? {

@@ -12,7 +12,9 @@ final class FeedbackReporter {
     private let baseURL: String
     private let analyticsEnabledKey = "KnowledgeCache.analyticsEnabled"
     private let lastAnalyticsSentKey = "KnowledgeCache.lastAnalyticsSent"
+    private let installIdKey = "KnowledgeCache.installId"
     private let analyticsInterval: TimeInterval = 86400
+    private let sessionId = UUID().uuidString
 
     init(pendingStore: PendingFeedbackStore) {
         self.pendingStore = pendingStore
@@ -51,6 +53,22 @@ final class FeedbackReporter {
                 self.pendingStore.synchronouslyRemove(ids: sentIds)
                 AppLogger.info("Feedback: sent \(sentIds.count) report(s)")
             }
+            let failedCount = max(0, items.count - sentIds.count)
+            let successRate = items.isEmpty ? 1.0 : Double(sentIds.count) / Double(items.count)
+            let queueMetrics = self.pendingStore.synchronouslyQueueMetrics()
+            self.sendAnalyticsEvent(
+                event: "feedback_flush",
+                metrics: [
+                    "pending_queue_size": queueMetrics.count,
+                    "oldest_pending_age_seconds": queueMetrics.oldestPendingAgeSeconds,
+                    "flush_attempted_count": items.count,
+                    "flush_sent_count": sentIds.count,
+                    "flush_failed_count": failedCount,
+                    "flush_success_rate": successRate,
+                    "sync_error_rate": 1.0 - successRate
+                ],
+                isConnected: isConnected
+            )
             let sent = sentIds.count
             Task { @MainActor in
                 completion?(sent, sent == items.count ? nil : lastError)
@@ -74,10 +92,12 @@ final class FeedbackReporter {
                 guard let self = self else { return }
                 if await self.sendFeedbackItemAsync(item) { return }
                 self.pendingStore.append(item)
+                self.emitQueueHealthEvent(reason: "send_failed_queued", isConnected: isConnected)
             }
             return
         }
         pendingStore.append(item)
+        emitQueueHealthEvent(reason: "queued_offline", isConnected: isConnected)
     }
 
     /// Send minimal analytics (opt-in, throttled to once per interval).
@@ -86,12 +106,10 @@ final class FeedbackReporter {
         let last = UserDefaults.standard.double(forKey: lastAnalyticsSentKey)
         let now = Date().timeIntervalSince1970
         guard now - last >= analyticsInterval else { return }
-        let body: [String: Any] = [
-            "event": "session",
-            "app_version": Self.appVersion,
-            "saves_count": savesCount,
-            "timestamp": Self.iso8601()
+        var body: [String: Any] = [
+            "saves_count": savesCount
         ]
+        body.merge(defaultAnalyticsFields(event: "session")) { _, new in new }
         guard let data = try? JSONSerialization.data(withJSONObject: body),
               let url = URL(string: baseURL + FeedbackConfig.analyticsPath) else { return }
         var request = URLRequest(url: url)
@@ -107,8 +125,38 @@ final class FeedbackReporter {
         }.resume()
     }
 
+    /// Send event-level analytics for KPI reporting.
+    func sendAnalyticsEvent(event: String, metrics: [String: Any], isConnected: Bool) {
+        guard isAnalyticsEnabled, isConnected, !baseURL.isEmpty else { return }
+        var body = defaultAnalyticsFields(event: event)
+        body.merge(metrics) { _, new in new }
+        guard let data = try? JSONSerialization.data(withJSONObject: body),
+              let url = URL(string: baseURL + FeedbackConfig.analyticsPath) else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        Self.addProtectionBypassHeader(to: &request)
+        request.httpBody = data
+        request.timeoutInterval = 15
+        URLSession.shared.dataTask(with: request).resume()
+    }
+
     func pendingCount() -> Int {
         pendingStore.synchronouslyLoad().count
+    }
+
+    /// Emits queue-health metrics while online for operational alerting.
+    func emitQueueHealthEvent(reason: String, isConnected: Bool) {
+        let queueMetrics = pendingStore.synchronouslyQueueMetrics()
+        sendAnalyticsEvent(
+            event: "feedback_queue_health",
+            metrics: [
+                "queue_reason": reason,
+                "pending_queue_size": queueMetrics.count,
+                "oldest_pending_age_seconds": queueMetrics.oldestPendingAgeSeconds
+            ],
+            isConnected: isConnected
+        )
     }
 
     private func sendFeedbackItemAsync(_ item: FeedbackItem) async -> Bool {
@@ -160,6 +208,26 @@ final class FeedbackReporter {
     private static var osVersion: String {
         let v = ProcessInfo.processInfo.operatingSystemVersion
         return "\(v.majorVersion).\(v.minorVersion).\(v.patchVersion)"
+    }
+
+    private var installId: String {
+        if let existing = UserDefaults.standard.string(forKey: installIdKey), !existing.isEmpty {
+            return existing
+        }
+        let next = UUID().uuidString
+        UserDefaults.standard.set(next, forKey: installIdKey)
+        return next
+    }
+
+    private func defaultAnalyticsFields(event: String) -> [String: Any] {
+        [
+            "event": event,
+            "app_version": Self.appVersion,
+            "os_version": Self.osVersion,
+            "install_id": installId,
+            "session_id": sessionId,
+            "timestamp": Self.iso8601()
+        ]
     }
 
     private static func addProtectionBypassHeader(to request: inout URLRequest) {
