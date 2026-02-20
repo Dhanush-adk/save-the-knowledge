@@ -298,8 +298,8 @@ async function checkRateLimit(req, res, route, limit = DEFAULT_LIMIT) {
     analytics: Number(process.env.RATE_LIMIT_ANALYTICS_PER_MIN || 60),
     feedback: Number(process.env.RATE_LIMIT_FEEDBACK_PER_MIN || 30),
     stats: Number(process.env.RATE_LIMIT_STATS_PER_MIN || 60),
-    investor_kpis: Number(process.env.RATE_LIMIT_INVESTOR_KPIS_PER_MIN || 40),
-    investor_export: Number(process.env.RATE_LIMIT_INVESTOR_EXPORT_PER_MIN || 20),
+    kpis: Number(process.env.RATE_LIMIT_KPIS_PER_MIN || 40),
+    kpi_export: Number(process.env.RATE_LIMIT_KPI_EXPORT_PER_MIN || 20),
     retention_export: Number(process.env.RATE_LIMIT_RETENTION_EXPORT_PER_MIN || 20),
     offline_save: Number(process.env.RATE_LIMIT_OFFLINE_SAVE_PER_MIN || 60),
   };

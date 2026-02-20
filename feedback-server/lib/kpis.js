@@ -165,7 +165,7 @@ function computeOpsSignals(analytics) {
   };
 }
 
-function computeInvestorKpis(analytics) {
+function computeKpis(analytics) {
   const events = (Array.isArray(analytics) ? analytics : [])
     .map((e) => ({ ...e, ts: parseTs(e) }))
     .filter((e) => e.ts)
@@ -269,7 +269,7 @@ function periodKey(date, period) {
   return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
 }
 
-function generateInvestorSnapshots(analytics, period = 'weekly') {
+function generatePeriodicSnapshots(analytics, period = 'weekly') {
   const safePeriod = period === 'monthly' ? 'monthly' : 'weekly';
   const events = (Array.isArray(analytics) ? analytics : [])
     .map((e) => ({ ...e, ts: parseTs(e) }))
@@ -284,7 +284,7 @@ function generateInvestorSnapshots(analytics, period = 'weekly') {
 
   const periods = [...buckets.keys()].sort();
   const snapshots = periods.map((key) => {
-    const k = computeInvestorKpis(buckets.get(key));
+    const k = computeKpis(buckets.get(key));
     return {
       period: key,
       total_events: k.summary.total_events ?? 0,
@@ -310,7 +310,7 @@ function generateInvestorSnapshots(analytics, period = 'weekly') {
   };
 }
 
-function investorSnapshotsToCsv(exportData) {
+function periodicSnapshotsToCsv(exportData) {
   const rows = exportData.snapshots || [];
   const headers = [
     'period',
@@ -401,9 +401,9 @@ function retentionCohortsToCsv(exportData) {
 }
 
 module.exports = {
-  computeInvestorKpis,
-  generateInvestorSnapshots,
-  investorSnapshotsToCsv,
+  computeKpis,
+  generatePeriodicSnapshots,
+  periodicSnapshotsToCsv,
   generateRetentionCohorts,
   retentionCohortsToCsv,
   computeOpsSignals,

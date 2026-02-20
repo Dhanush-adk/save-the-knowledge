@@ -1,5 +1,5 @@
 const { readData } = require('../lib/store');
-const { computeInvestorKpis } = require('../lib/kpis');
+const { computeKpis } = require('../lib/kpis');
 const { requireDashboardAccess, checkRateLimit } = require('../lib/security');
 
 function parseDateInput(raw, endOfDay = false) {
@@ -71,7 +71,7 @@ module.exports = async (req, res) => {
     };
 
     // KPI computation should use the full filtered dataset, even if we only preview N rows in the UI.
-    data.kpis = computeInvestorKpis(analyticsAll);
+    data.kpis = computeKpis(analyticsAll);
     data.analytics = analyticsAll.slice(0, limitAnalytics);
     data.feedback = feedbackAll.slice(0, limitFeedback);
     data.saved_urls = savedUrlsAll.slice(0, limitSavedUrls);

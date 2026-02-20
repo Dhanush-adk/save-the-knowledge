@@ -1,7 +1,7 @@
 class SaveTheKnowledge < Formula
   desc "Offline-first local knowledge base desktop app for macOS"
-  homepage "https://github.com/YOUR_GITHUB_USER/knowledge-cache"
-  url "https://github.com/YOUR_GITHUB_USER/knowledge-cache/archive/refs/tags/v1.0.0.tar.gz"
+  homepage "https://github.com/Dhanush-adk/save-the-knowledge"
+  url "https://github.com/Dhanush-adk/save-the-knowledge/archive/refs/tags/v1.0.0.tar.gz"
   sha256 "REPLACE_WITH_SOURCE_TARBALL_SHA256"
   license "MIT"
 

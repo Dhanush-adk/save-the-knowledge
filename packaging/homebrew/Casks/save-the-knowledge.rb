@@ -2,11 +2,11 @@ cask "save-the-knowledge" do
   version "1.0.0"
   sha256 "REPLACE_WITH_RELEASE_ASSET_SHA256"
 
-  url "https://github.com/YOUR_GITHUB_USER/knowledge-cache/releases/download/v#{version}/save-the-knowledge-macOS-v#{version}-bBUILD-unsigned.dmg",
-      verified: "github.com/YOUR_GITHUB_USER/knowledge-cache/"
+  url "https://github.com/Dhanush-adk/save-the-knowledge/releases/download/v#{version}/save-the-knowledge-macOS-v#{version}-bBUILD-unsigned.dmg",
+      verified: "github.com/Dhanush-adk/save-the-knowledge/"
   name "Save the Knowledge"
   desc "Offline-first local knowledge base desktop app"
-  homepage "https://github.com/YOUR_GITHUB_USER/knowledge-cache"
+  homepage "https://github.com/Dhanush-adk/save-the-knowledge"
 
   depends_on macos: ">= :sonoma"
 
