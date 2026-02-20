@@ -44,13 +44,11 @@ fi
 sha="$(shasum -a 256 "$DMG_PATH" | awk '{print $1}')"
 
 # BSD sed on macOS requires -i ''
-sed -i '' -E "s/^  version \"[^\"]+\"/  version \"$version\"/" "$CASK_FILE"
-sed -i '' -E "s/^  build \"[^\"]+\"/  build \"$build\"/" "$CASK_FILE"
+sed -i '' -E "s/^  version \"[^\"]+\"/  version \"$version,$build\"/" "$CASK_FILE"
 sed -i '' -E "s/^  sha256 \"[^\"]+\"/  sha256 \"$sha\"/" "$CASK_FILE"
 
 echo "Updated $CASK_FILE"
-echo " - version: $version"
-echo " - build:   $build"
+echo " - version: $version,$build"
 echo " - sha256:  $sha"
 echo
 echo "Next:"
