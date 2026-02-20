@@ -99,4 +99,69 @@ final class SaveAndAskIntegrationTests: XCTestCase {
         }
         print("--- EXTRACTED_CHUNKS_END ---")
     }
+
+    func testSearchPrefersResumeContentForResumeQuery() throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("KnowledgeCacheResumeQuery-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let db = Database(path: tempDir.appendingPathComponent("test.db").path)
+        try db.open()
+        defer { db.close() }
+
+        let store = KnowledgeStore(db: db)
+        let embedding = MockEmbeddingService()
+        let pipeline = IngestionPipeline(store: store, embedding: embedding)
+        let search = SemanticSearch(store: store, embedding: embedding)
+
+        _ = try pipeline.ingestPastedText("""
+        Dhanush Resume
+        Software Engineer with 2+ years experience in SDE and backend systems.
+        Resume and portfolio available.
+        """)
+        _ = try pipeline.ingestPastedText("""
+        I20 Document
+        Immigration form and student eligibility details.
+        """)
+
+        let outcome = search.search(query: "does dhanush kumar has the resume", topK: 3)
+        guard case .results(let results) = outcome else {
+            XCTFail("Expected results")
+            return
+        }
+        XCTAssertFalse(results.isEmpty)
+        XCTAssertEqual(results.first?.title, "Dhanush Resume")
+    }
+
+    func testSearchHandlesMergedNameTokenForContactQuery() throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("KnowledgeCacheMergedNameQuery-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let db = Database(path: tempDir.appendingPathComponent("test.db").path)
+        try db.open()
+        defer { db.close() }
+
+        let store = KnowledgeStore(db: db)
+        let embedding = MockEmbeddingService()
+        let pipeline = IngestionPipeline(store: store, embedding: embedding)
+        let search = SemanticSearch(store: store, embedding: embedding)
+
+        _ = try pipeline.ingestPastedText("""
+        Dhanush Resume
+        Contact: danthara@charlotte.edu and +1 (704) 930-3938.
+        """)
+        _ = try pipeline.ingestPastedText("""
+        Random Website
+        A generic content page without contact details.
+        """)
+
+        let outcome = search.search(query: "what are dhanushkumar contact details", topK: 3)
+        guard case .results(let results) = outcome else {
+            XCTFail("Expected results")
+            return
+        }
+        XCTAssertFalse(results.isEmpty)
+        XCTAssertEqual(results.first?.title, "Dhanush Resume")
+    }
 }

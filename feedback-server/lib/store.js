@@ -1,8 +1,11 @@
 const BLOB_PATH = 'kc/data.json';
-const MAX_ANALYTICS = 200;
-const MAX_FEEDBACK = 200;
-const MAX_SAVED_URLS = 1000;
-const MAX_IDEMPOTENCY_KEYS = 2000;
+// 0 means "no cap" (persist everything). Dashboard endpoints should page/slice.
+const MAX_ANALYTICS = Number.parseInt(process.env.MAX_ANALYTICS || '0', 10) || 0;
+const MAX_FEEDBACK = Number.parseInt(process.env.MAX_FEEDBACK || '0', 10) || 0;
+const MAX_SAVED_URLS = Number.parseInt(process.env.MAX_SAVED_URLS || '0', 10) || 0;
+const MAX_ISSUES = Number.parseInt(process.env.MAX_ISSUES || '0', 10) || 0;
+const MAX_IDEMPOTENCY_KEYS = Number.parseInt(process.env.MAX_IDEMPOTENCY_KEYS || '2000', 10) || 2000;
+const crypto = require('crypto');
 
 async function getBlobClient() {
   try {
@@ -16,55 +19,106 @@ async function getBlobClient() {
 async function readData() {
   const client = await getBlobClient();
   if (!client || !process.env.BLOB_READ_WRITE_TOKEN) {
-    return { analytics: [], feedback: [], saved_urls: [], idempotency: [] };
+    return { analytics: [], feedback: [], saved_urls: [], issues: [], idempotency: [] };
   }
   try {
     const { list } = client;
     const { blobs } = await list({ prefix: 'kc/' });
     const dataBlob = blobs.find((b) => b.pathname === BLOB_PATH);
-    if (!dataBlob?.url) return { analytics: [], feedback: [], saved_urls: [], idempotency: [] };
+    if (!dataBlob?.url) return { analytics: [], feedback: [], saved_urls: [], issues: [], idempotency: [] };
     const res = await fetch(dataBlob.url);
-    if (!res.ok) return { analytics: [], feedback: [], saved_urls: [], idempotency: [] };
-    const json = await res.json();
+    if (!res.ok) return { analytics: [], feedback: [], saved_urls: [], issues: [], idempotency: [] };
+    const raw = await res.json();
+    const json = decryptStoredPayload(raw);
     return {
       analytics: Array.isArray(json.analytics) ? json.analytics : [],
       feedback: Array.isArray(json.feedback) ? json.feedback : [],
       saved_urls: Array.isArray(json.saved_urls) ? json.saved_urls : [],
+      issues: Array.isArray(json.issues) ? json.issues : [],
       idempotency: Array.isArray(json.idempotency) ? json.idempotency : [],
     };
   } catch (e) {
     console.error('[store] read', e);
-    return { analytics: [], feedback: [], saved_urls: [], idempotency: [] };
+    return { analytics: [], feedback: [], saved_urls: [], issues: [], idempotency: [] };
   }
 }
 
 async function writeData(data) {
   const client = await getBlobClient();
-  if (!client || !process.env.BLOB_READ_WRITE_TOKEN) return;
+  if (!client || !process.env.BLOB_READ_WRITE_TOKEN) {
+    throw new Error('blob_token_missing');
+  }
+  const { put } = client;
+  const encrypted = encryptStoredPayload(data);
+  await put(BLOB_PATH, JSON.stringify(encrypted), {
+    access: 'public',
+    addRandomSuffix: false,
+    contentType: 'application/json',
+    allowOverwrite: true,
+  });
+}
+
+function getCipherKey() {
+  const raw = (process.env.FEEDBACK_DATA_ENCRYPTION_KEY || process.env.FEEDBACK_API_KEY || '').trim();
+  if (!raw) return null;
+  return crypto.createHash('sha256').update(raw).digest();
+}
+
+function encryptStoredPayload(data) {
+  const key = getCipherKey();
+  if (!key) return data;
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const plaintext = Buffer.from(JSON.stringify(data), 'utf8');
+  const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return {
+    v: 1,
+    alg: 'aes-256-gcm',
+    iv: iv.toString('base64'),
+    tag: tag.toString('base64'),
+    data: encrypted.toString('base64')
+  };
+}
+
+function decryptStoredPayload(raw) {
+  if (!raw || typeof raw !== 'object' || raw.v !== 1 || !raw.iv || !raw.tag || !raw.data) {
+    return raw || {};
+  }
+  const key = getCipherKey();
+  if (!key) return {};
   try {
-    const { put } = client;
-    await put(BLOB_PATH, JSON.stringify(data), {
-      access: 'public',
-      addRandomSuffix: false,
-      contentType: 'application/json',
-      allowOverwrite: true,
-    });
+    const iv = Buffer.from(raw.iv, 'base64');
+    const tag = Buffer.from(raw.tag, 'base64');
+    const encrypted = Buffer.from(raw.data, 'base64');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(tag);
+    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+    return JSON.parse(decrypted.toString('utf8'));
   } catch (e) {
-    console.error('[store] write', e);
+    console.error('[store] decrypt', e);
+    return {};
   }
 }
 
 async function appendAnalytics(payload) {
   const data = await readData();
   data.analytics.unshift({ ...payload, _at: new Date().toISOString() });
-  data.analytics.splice(MAX_ANALYTICS);
+  if (MAX_ANALYTICS > 0) data.analytics.splice(MAX_ANALYTICS);
   await writeData(data);
 }
 
 async function appendFeedback(payload) {
   const data = await readData();
   data.feedback.unshift({ ...payload, _at: new Date().toISOString() });
-  data.feedback.splice(MAX_FEEDBACK);
+  if (MAX_FEEDBACK > 0) data.feedback.splice(MAX_FEEDBACK);
+  await writeData(data);
+}
+
+async function appendIssue(payload) {
+  const data = await readData();
+  data.issues.unshift({ ...payload, _at: new Date().toISOString() });
+  if (MAX_ISSUES > 0) data.issues.splice(MAX_ISSUES);
   await writeData(data);
 }
 
@@ -94,7 +148,7 @@ async function appendSavedUrl(payload) {
     return !canonical || existing !== canonical;
   });
   data.saved_urls.unshift(next);
-  data.saved_urls.splice(MAX_SAVED_URLS);
+  if (MAX_SAVED_URLS > 0) data.saved_urls.splice(MAX_SAVED_URLS);
   await writeData(data);
   return next;
 }
@@ -111,9 +165,9 @@ async function consumeIdempotencyKey(key) {
   const exists = data.idempotency.some((entry) => entry.key === key);
   if (exists) return false;
   data.idempotency.unshift({ key, at: now });
-  data.idempotency.splice(MAX_IDEMPOTENCY_KEYS);
+  if (MAX_IDEMPOTENCY_KEYS > 0) data.idempotency.splice(MAX_IDEMPOTENCY_KEYS);
   await writeData(data);
   return true;
 }
 
-module.exports = { readData, appendAnalytics, appendFeedback, appendSavedUrl, consumeIdempotencyKey };
+module.exports = { readData, appendAnalytics, appendFeedback, appendIssue, appendSavedUrl, consumeIdempotencyKey };

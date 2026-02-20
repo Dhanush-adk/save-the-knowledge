@@ -1,5 +1,6 @@
 const { readData } = require('../lib/store');
 const { generateRetentionCohorts, retentionCohortsToCsv } = require('../lib/kpis');
+const { requireDashboardAccess, checkRateLimit } = require('../lib/security');
 
 function parseDateInput(raw, endOfDay = false) {
   if (!raw || typeof raw !== 'string') return null;
@@ -31,6 +32,8 @@ module.exports = async (req, res) => {
     res.status(405).end();
     return;
   }
+  if (!requireDashboardAccess(req, res)) return;
+  if (!(await checkRateLimit(req, res, 'retention_export'))) return;
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const format = (url.searchParams.get('format') || 'json').toLowerCase();
@@ -50,7 +53,8 @@ module.exports = async (req, res) => {
     });
     const exportData = generateRetentionCohorts(analytics);
 
-    res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
+    // Authenticated dashboard data should never be cached by shared proxies/edges.
+    res.setHeader('Cache-Control', 'private, no-store');
     if (safeFormat === 'csv') {
       const csv = retentionCohortsToCsv(exportData);
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');

@@ -27,6 +27,26 @@ struct RetrievalResult: Identifiable {
     }
 
     var sourceRef: SourceRef {
-        SourceRef(title: title, url: url, snippet: String(chunkText.prefix(200)), knowledgeItemId: knowledgeItemId)
+        SourceRef(
+            title: title,
+            url: url,
+            snippet: cleanedSnippet(from: chunkText),
+            knowledgeItemId: knowledgeItemId
+        )
+    }
+
+    private func cleanedSnippet(from text: String) -> String {
+        var snippet = text
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "•", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        while snippet.contains("  ") {
+            snippet = snippet.replacingOccurrences(of: "  ", with: " ")
+        }
+        snippet = String(snippet.prefix(200))
+        if let last = snippet.last, !".!?".contains(last) {
+            snippet.append("…")
+        }
+        return snippet
     }
 }

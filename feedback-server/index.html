@@ -21,6 +21,30 @@
     .refresh { margin-bottom: 16px; }
     .refresh button { padding: 8px 14px; background: #333; color: #e0e0e0; border: 1px solid #444; border-radius: 6px; cursor: pointer; }
     .refresh button:hover { background: #444; }
+    .authbar {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 8px;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+    .authbar input {
+      border: 1px solid #444;
+      background: #1a1a1a;
+      color: #eee;
+      border-radius: 6px;
+      padding: 8px 10px;
+      width: 100%;
+    }
+    .authbar button {
+      padding: 8px 12px;
+      border: 1px solid #444;
+      background: #2a2a2a;
+      color: #eee;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .auth-note { color: #8a8a8a; font-size: 0.82rem; margin-bottom: 10px; }
     .filters {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -103,7 +127,16 @@
     .kpi-label { color: #8a8a8a; font-size: 0.8rem; }
     .kpi-value { font-size: 1.25rem; font-weight: 600; margin-top: 4px; }
     .export-links { display: flex; gap: 10px; margin: 8px 0 12px; }
-    .export-links a { color: #9ec1ff; text-decoration: none; font-size: 0.9rem; }
+    .export-links button {
+      color: #9ec1ff;
+      text-decoration: none;
+      font-size: 0.9rem;
+      border: 1px solid #36507d;
+      background: #1a1a1a;
+      border-radius: 6px;
+      padding: 7px 10px;
+      cursor: pointer;
+    }
     .alert-list { display: grid; gap: 8px; margin-top: 10px; }
     .alert-item {
       border: 1px solid #3b3b3b;
@@ -134,11 +167,11 @@
           <button type="button" id="btn-back" title="Back">Back</button>
           <button type="button" id="btn-forward" title="Forward">Forward</button>
           <button type="button" id="btn-reload" title="Reload">Reload</button>
-          <input id="address" type="text" placeholder="Enter URL or search query" />
+          <input id="address" type="text" placeholder="Enter URL" />
           <button type="button" id="btn-save">Save Offline</button>
         </div>
         <div class="browser-note">Some sites block iframe embedding. In desktop app webview mode, this limitation can be handled differently.</div>
-        <iframe id="browser-frame" title="Browser frame" src="https://duckduckgo.com"></iframe>
+        <iframe id="browser-frame" title="Browser frame" src="about:blank"></iframe>
       </div>
       <div id="save-status" class="status-text"></div>
     </section>
@@ -152,6 +185,12 @@
   </div>
 
   <div id="ops-panel" class="panel">
+    <div class="authbar">
+      <input id="dashboard-password" type="password" placeholder="Admin password" />
+      <button type="button" id="dashboard-login">Login</button>
+      <button type="button" id="dashboard-logout">Logout</button>
+    </div>
+    <div class="auth-note">Login uses a secure HttpOnly session cookie. No key is stored in this browser.</div>
     <div class="refresh">
       <button type="button" id="refresh">Refresh</button>
     </div>
@@ -219,8 +258,8 @@
     <section>
       <h2>Retention Cohorts</h2>
       <div class="export-links">
-        <a id="retention-json-link" href="/api/retention-export?format=json" target="_blank" rel="noreferrer noopener">Open JSON</a>
-        <a id="retention-csv-link" href="/api/retention-export?format=csv" target="_blank" rel="noreferrer noopener">Download CSV</a>
+        <button type="button" id="retention-json-btn">Download JSON</button>
+        <button type="button" id="retention-csv-btn">Download CSV</button>
       </div>
       <table>
         <thead>
@@ -261,6 +300,13 @@
       <div id="feedback-list"></div>
       <p id="feedback-empty" class="empty" style="display:none;">No feedback yet.</p>
     </section>
+
+    <section>
+      <h2>Raised Issues (last 200)</h2>
+      <div id="issues-summary"></div>
+      <div id="issues-list"></div>
+      <p id="issues-empty" class="empty" style="display:none;">No issues yet.</p>
+    </section>
   </div>
 
   <script>
@@ -280,7 +326,8 @@
       const value = (input || '').trim();
       if (!value) return null;
       if (/^https?:\/\//i.test(value)) return value;
-      return `https://duckduckgo.com/?q=${encodeURIComponent(value)}`;
+      if (value.includes('.') && !value.includes(' ')) return `https://${value}`;
+      return null;
     }
 
     function navigate(next, push = true) {
@@ -310,10 +357,46 @@
       });
     }
 
+    async function apiFetch(path, init = {}) {
+      const headers = new Headers(init.headers || {});
+      // Always include cookies for admin session.
+      return fetch(base + path, { ...init, headers, credentials: 'include' });
+    }
+
+    async function loginDashboard() {
+      const password = (document.getElementById('dashboard-password').value || '').trim();
+      if (!password) {
+        alert('Enter admin password.');
+        return;
+      }
+      const res = await apiFetch('/api/admin-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        alert('Login failed.');
+        return;
+      }
+      await load();
+    }
+
+    async function logoutDashboard() {
+      await apiFetch('/api/admin-logout', { method: 'POST' }).catch(() => {});
+      await load();
+    }
+
+    async function ensureSession() {
+      const res = await apiFetch('/api/admin-session');
+      const data = await res.json().catch(() => ({}));
+      return !!data.authenticated;
+    }
+
     async function saveOffline() {
       const url = toUrlOrSearch(addressInput.value);
       if (!url) {
-        saveStatus.textContent = 'Enter a URL or search query.';
+        saveStatus.textContent = 'Enter a valid URL.';
         return;
       }
       saveStatus.textContent = 'Saving...';
@@ -341,6 +424,11 @@
 
     async function load() {
       try {
+        const authed = await ensureSession();
+        if (!authed) {
+          document.getElementById('analytics-summary').innerHTML = '<span class="error">Login required. Enter admin password and click Login.</span>';
+          return;
+        }
         const params = new URLSearchParams();
         if (filters.from) params.set('from', filters.from);
         if (filters.to) params.set('to', filters.to);
@@ -350,14 +438,20 @@
         updateRetentionExportLinks();
 
         const [statsRes, retentionRes] = await Promise.all([
-          fetch(base + '/api/stats' + q),
-          fetch(base + '/api/retention-export?format=json' + (q ? `&${q.slice(1)}` : '')),
+          apiFetch('/api/stats' + q),
+          apiFetch('/api/retention-export?format=json' + (q ? `&${q.slice(1)}` : '')),
         ]);
+        if (statsRes.status === 401) {
+          document.getElementById('analytics-summary').innerHTML = '<span class="error">Unauthorized. Please login again.</span>';
+          return;
+        }
         const data = await statsRes.json();
+        window.__kc_counts = data.counts || null;
         const retentionData = retentionRes.ok ? await retentionRes.json() : { cohorts: [] };
         renderKpis(data.kpis || {});
         renderAnalytics(data.analytics || []);
         renderFeedback(data.feedback || []);
+        renderIssues(data.issues || []);
         renderSavedUrls(data.saved_urls || []);
         renderRetentionCohorts(retentionData.cohorts || []);
       } catch (e) {
@@ -368,7 +462,10 @@
       const tbody = document.getElementById('analytics-body');
       const empty = document.getElementById('analytics-empty');
       const summary = document.getElementById('analytics-summary');
-      summary.textContent = arr.length ? `Total: ${arr.length} event(s)` : '';
+      const total = window.__kc_counts?.analytics_total;
+      summary.textContent = arr.length
+        ? (Number.isFinite(total) ? `Total: ${total} event(s) (showing ${arr.length})` : `Total: ${arr.length} event(s)`)
+        : '';
       if (!arr.length) {
         tbody.innerHTML = '';
         empty.style.display = 'block';
@@ -481,7 +578,10 @@
       const list = document.getElementById('feedback-list');
       const empty = document.getElementById('feedback-empty');
       const summary = document.getElementById('feedback-summary');
-      summary.textContent = arr.length ? `Total: ${arr.length} report(s)` : '';
+      const total = window.__kc_counts?.feedback_total;
+      summary.textContent = arr.length
+        ? (Number.isFinite(total) ? `Total: ${total} report(s) (showing ${arr.length})` : `Total: ${arr.length} report(s)`)
+        : '';
       if (!arr.length) {
         list.innerHTML = '';
         empty.style.display = 'block';
@@ -492,7 +592,29 @@
         <div class="card">
           <span class="time">${formatTs(f._at || f.timestamp || '—')} · ${f.type || 'feedback'} · ${f.app_version || '—'}</span>
           <div class="message">${escapeHtml(f.message || '')}</div>
-          ${f.email ? `<div class="time">Reply: ${escapeHtml(f.email)}</div>` : ''}
+          <div class="time">Reply: ${f.email ? escapeHtml(f.email) : '—'}</div>
+        </div>
+      `).join('');
+    }
+    function renderIssues(arr) {
+      const list = document.getElementById('issues-list');
+      const empty = document.getElementById('issues-empty');
+      const summary = document.getElementById('issues-summary');
+      const total = window.__kc_counts?.issues_total;
+      summary.textContent = arr.length
+        ? (Number.isFinite(total) ? `Total: ${total} issue(s) (showing ${arr.length})` : `Total: ${arr.length} issue(s)`)
+        : '';
+      if (!arr.length) {
+        list.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      list.innerHTML = arr.map((i) => `
+        <div class="card">
+          <span class="time">${formatTs(i._at || i.timestamp || '—')} · ${escapeHtml(i.severity || 'error')} · ${escapeHtml(i.category || 'unknown')} · ${escapeHtml(i.app_version || '—')}</span>
+          <div class="message">${escapeHtml(i.message || '')}</div>
+          <div class="time">${i.details ? escapeHtml(i.details) : '—'}</div>
         </div>
       `).join('');
     }
@@ -516,24 +638,41 @@
         </tr>
       `).join('');
     }
-    function updateRetentionExportLinks() {
+    function updateRetentionExportLinks() {}
+
+    async function downloadRetention(format) {
+      const authed = await ensureSession();
+      if (!authed) { alert('Login required.'); return; }
       const params = new URLSearchParams();
       if (filters.from) params.set('from', filters.from);
       if (filters.to) params.set('to', filters.to);
       if (filters.install_id) params.set('install_id', filters.install_id);
       if (filters.event) params.set('event', filters.event);
-      const jsonParams = new URLSearchParams(params);
-      jsonParams.set('format', 'json');
-      const csvParams = new URLSearchParams(params);
-      csvParams.set('format', 'csv');
-      document.getElementById('retention-json-link').href = `/api/retention-export?${jsonParams.toString()}`;
-      document.getElementById('retention-csv-link').href = `/api/retention-export?${csvParams.toString()}`;
+      params.set('format', format);
+      const res = await apiFetch(`/api/retention-export?${params.toString()}`);
+      if (!res.ok) {
+        alert(`Export failed (${res.status}).`);
+        return;
+      }
+      const blob = await res.blob();
+      const ext = format === 'csv' ? 'csv' : 'json';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `retention-cohorts.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
     }
     function renderSavedUrls(arr) {
       const list = document.getElementById('saved-list');
       const empty = document.getElementById('saved-empty');
       const summary = document.getElementById('saved-summary');
-      summary.textContent = arr.length ? `Total saved: ${arr.length}` : '';
+      const total = window.__kc_counts?.saved_urls_total;
+      summary.textContent = arr.length
+        ? (Number.isFinite(total) ? `Total saved: ${total} (showing ${arr.length})` : `Total saved: ${arr.length}`)
+        : '';
       if (!arr.length) {
         list.innerHTML = '';
         empty.style.display = 'block';
@@ -574,6 +713,13 @@
       btn.addEventListener('click', () => setActivePanel(btn.dataset.panel));
     });
     document.getElementById('refresh').addEventListener('click', load);
+    document.getElementById('dashboard-login').addEventListener('click', loginDashboard);
+    document.getElementById('dashboard-logout').addEventListener('click', logoutDashboard);
+    document.getElementById('dashboard-password').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') loginDashboard();
+    });
+    document.getElementById('retention-json-btn').addEventListener('click', () => downloadRetention('json'));
+    document.getElementById('retention-csv-btn').addEventListener('click', () => downloadRetention('csv'));
     document.getElementById('apply-filters').addEventListener('click', () => {
       filters.from = document.getElementById('filter-from').value || '';
       filters.to = document.getElementById('filter-to').value || '';
@@ -592,7 +738,6 @@
       document.getElementById('filter-event').value = '';
       load();
     });
-    navigate('https://duckduckgo.com');
     load();
   </script>
 </body>

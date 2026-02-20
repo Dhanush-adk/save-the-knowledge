@@ -1,14 +1,14 @@
-# Build
+# macOS
+.DS_Store
+
+# Build artifacts
 build/
 DerivedData/
 
-# Xcode
+# Xcode user state
 *.xcuserstate
 xcuserdata/
 *.moved-aside
-
-# macOS
-.DS_Store
 
 # Python
 venv/
@@ -17,15 +17,25 @@ venv/
 __pycache__/
 *.pyc
 
-# Unnecessary docs (personal/validation notes)
-docs/extracted-adhanushkumar-summary.md
-docs/implementation-notes-from-validation.md
-docs/plan-validation-and-notes.md
+# Node / server local deps
+feedback-server/node_modules/
 
-# Keep only docs/README.md committed from root docs/
-docs/*
-!docs/
-!docs/README.md
+# Local env and secrets
+.env
+.env.*
+*.pem
+*.p12
+*.mobileprovision
 
-# Local website-only gitignore file (not part of product repo)
-website/.gitignore
+# Local tooling artifacts (keep local only)
+AGENTS.md
+FINAL_PRODUCT.md
+.playwright-cli/
+output/
+scripts/run_playwright_e2e.sh
+
+# Local hosting/deploy metadata
+website/.vercel/
+
+# Optional CI workflows (uncomment if you want to publish workflows)
+# .github/workflows/*.yml

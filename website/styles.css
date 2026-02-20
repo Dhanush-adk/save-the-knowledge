@@ -75,6 +75,24 @@ nav {
   align-items: center;
 }
 
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.nav-link {
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.nav-link:hover {
+  opacity: 1;
+}
+
 .logo {
   font-weight: 600;
   font-size: 1.1rem;
@@ -226,6 +244,83 @@ main > section:not(.cases) {
   font-size: 0.95rem;
   color: var(--text-muted);
   margin: 0;
+}
+
+.about,
+.install {
+  padding: 3.5rem 0;
+}
+
+.about h2,
+.install h2 {
+  font-size: 1.6rem;
+  font-weight: 600;
+  text-align: center;
+  margin: 0 0 0.75rem;
+}
+
+.about-lead,
+.install-lead {
+  text-align: center;
+  color: var(--text-muted);
+  margin: 0 auto 2rem;
+  max-width: 740px;
+}
+
+.about-grid,
+.install-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.about-card,
+.install-card {
+  padding: 1.25rem;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(184, 221, 232, 0.4);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 20px var(--shadow-soft);
+}
+
+.about-card h3,
+.install-card h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+
+.about-card p {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.install-card pre {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 0.85rem;
+  overflow-x: auto;
+}
+
+.about-links {
+  margin: 1.1rem 0 0;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.about-links a {
+  color: var(--accent-hover);
+  text-decoration: none;
+}
+
+.about-links a:hover {
+  text-decoration: underline;
 }
 
 /* Case studies */
@@ -525,6 +620,14 @@ main > section:not(.cases) {
 }
 
 @media (max-width: 600px) {
+  .nav-link {
+    display: none;
+  }
+
+  .nav-actions {
+    gap: 0.45rem;
+  }
+
   main {
     padding: 0 1.25rem 3rem;
   }

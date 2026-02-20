@@ -1,7 +1,7 @@
 # XcodeGen spec. Run: xcodegen generate
 name: KnowledgeCache
 options:
-  bundleIdPrefix: com.knowledgecache
+  bundleIdPrefix: com.savetheknowledge
   deploymentTarget:
     macOS: "14.0"
   xcodeVersion: "15.0"
@@ -17,18 +17,20 @@ targets:
           - "EmbeddingModel.mlpackage"
           - "EmbeddingModel.mlmodel"
     resources:
+      - path: KnowledgeCache/Assets.xcassets
       - path: scripts/extract_structured.py
       - path: KnowledgeCache/EmbeddingModel.mlpackage
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.knowledgecache.app
+        PRODUCT_BUNDLE_IDENTIFIER: com.savetheknowledge.app
         INFOPLIST_FILE: KnowledgeCache/Info.plist
         LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
         SWIFT_EMIT_LOC_STRINGS: "YES"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         SWIFT_VERSION: "5.9"
-        PRODUCT_NAME: KnowledgeCache
+        PRODUCT_MODULE_NAME: KnowledgeCache
+        PRODUCT_NAME: Save the Knowledge
         CODE_SIGN_ENTITLEMENTS: KnowledgeCache/KnowledgeCache.entitlements
         ENABLE_APP_SANDBOX: "YES"
         COMBINE_HIDPI_IMAGES: "YES"
@@ -53,9 +55,11 @@ targets:
       - path: Tests/KnowledgeCacheTests
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.knowledgecache.tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.savetheknowledge.tests
         SWIFT_VERSION: "5.9"
         GENERATE_INFOPLIST_FILE: "YES"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Save the Knowledge.app/Contents/MacOS/Save the Knowledge"
+        BUNDLE_LOADER: "$(TEST_HOST)"
     dependencies:
       - target: KnowledgeCache
 schemes:

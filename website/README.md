@@ -1,43 +1,51 @@
-# Save the Knowledge — Website
+# Save the Knowledge Website
 
-Breezy landing page for the Save the Knowledge macOS app.
+Static marketing/documentation site for the Save the Knowledge project.
 
-## Preview locally
+## Contents
+
+- `index.html`: landing page with product overview, install snippets, and download section.
+- `styles.css`: site styling.
+- `vercel.json`: simple static hosting config.
+
+## Run locally
 
 ```bash
 cd website
 python3 -m http.server 8080
-# Open http://localhost:8080
 ```
 
-Or open `index.html` directly in a browser.
+Open: `http://localhost:8080`
 
-## Deploy to Vercel
+## Deploy
+
+### Vercel
 
 ```bash
 cd website
-vercel
+vercel --prod
 ```
 
-Or connect the repo to Vercel and set the root directory to `website`.
+Or connect repo and set root directory to `website`.
 
-## Deploy to Netlify
+### Netlify
 
-Drag the `website` folder to [Netlify Drop](https://app.netlify.com/drop), or connect the repo and set publish directory to `website`.
+Set publish directory to `website`, or drag/drop the folder into Netlify Drop.
 
-## Update download link
+## Before publishing
 
-1. Zip your Release build: `zip -r KnowledgeCache.zip KnowledgeCache.app`
-2. Upload to your host (e.g. Vercel Blob, S3, GitHub Releases)
-3. In `index.html`, set the download button href to your file URL:
-   ```html
-   <a href="https://yoursite.com/KnowledgeCache.zip" class="cta-download">Download Save the Knowledge</a>
-   ```
+Replace placeholder links in `index.html`:
 
-## Custom domain
+- `https://github.com/YOUR_GITHUB_USER/knowledge-cache`
 
-Point savetheknowledge.com to your Vercel/Netlify deployment in your DNS settings.
+Optional:
 
-## Newsletter
+- Update download CTA to your latest release asset URL.
+- Update footer legal text/policies if needed.
 
-The subscribe form uses `action="#"`. Connect it to a service (Mailchimp, Buttondown, ConvertKit) by updating the form's `action` URL and adding `name` attributes for their API.
+## Related docs
+
+- Root project readme: `../README.md`
+- Installation guide: `../docs/INSTALLATION.md`
+- Project overview: `../docs/PROJECT-OVERVIEW.md`
+- Homebrew distribution: `../docs/HOMEBREW-DISTRIBUTION.md`

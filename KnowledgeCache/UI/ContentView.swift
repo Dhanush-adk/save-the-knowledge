@@ -9,7 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var app = AppState()
-    @State private var selectedTab: Tab = .search
+    @State private var selectedTab: Tab = .chat
 
     private var appVersion: String {
         let info = Bundle.main.infoDictionary ?? [:]
@@ -19,16 +19,16 @@ struct ContentView: View {
     }
 
     enum Tab: String, CaseIterable {
-        case search = "Search"
+        case chat = "Chat"
         case settings = "Settings"
         case web = "Web"
         case save = "Save"
         case saved = "Library"
-        case history = "History"
+        case history = "Usage Analytics"
 
         var icon: String {
             switch self {
-            case .search: return "magnifyingglass"
+            case .chat: return "bubble.left.and.bubble.right.fill"
             case .web: return "globe"
             case .save: return "plus.circle.fill"
             case .saved: return "books.vertical.fill"
@@ -49,8 +49,8 @@ struct ContentView: View {
         } detail: {
             Group {
                 switch selectedTab {
-                case .search:
-                    SearchView(app: app)
+                case .chat:
+                    ChatView(app: app)
                 case .web:
                     WebSearchView(app: app)
                 case .save:
@@ -76,6 +76,7 @@ struct ContentView: View {
         .onAppear {
             app.refreshItems()
             app.refreshHistory()
+            app.refreshChatThreads()
         }
     }
 }

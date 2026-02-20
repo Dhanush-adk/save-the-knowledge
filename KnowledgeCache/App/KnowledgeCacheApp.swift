@@ -9,7 +9,7 @@
 import SwiftUI
 
 @main
-struct KnowledgeCacheApp: App {
+struct SaveTheKnowledgeApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()

@@ -2,175 +2,116 @@
 //  HistoryView.swift
 //  KnowledgeCache
 //
-//  Browse past questions and answers.
+//  Chat analytics dashboard.
 //
 
 import SwiftUI
 
 struct HistoryView: View {
     @ObservedObject var app: AppState
-    @State private var selectedId: UUID?
 
     var body: some View {
-        HSplitView {
-            // Question list
-            VStack(spacing: 0) {
-                if app.historyItems.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "clock")
-                            .font(.system(size: 32))
-                            .foregroundStyle(.tertiary)
-                        Text("No questions asked yet")
-                            .foregroundStyle(.secondary)
-                            .font(.subheadline)
-                        Text("Search your knowledge base to build history")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("Conversation Analytics")
+                    .font(.title2.weight(.semibold))
+
+                if let metrics = app.chatAnalytics {
+                    metricGrid(metrics: metrics)
+                    topConversations
+                    healthSection(metrics: metrics)
                 } else {
-                    List(selection: $selectedId) {
-                        ForEach(app.historyItems) { item in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(item.question)
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
+                    Text("No analytics yet. Start chatting to populate metrics.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(24)
+        }
+        .onAppear {
+            app.refreshChatAnalytics()
+        }
+    }
+
+    private func metricGrid(metrics: KnowledgeStore.ChatAnalyticsSummary) -> some View {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+            metricCard("Active conversations", value: "\(metrics.activeThreads)")
+            metricCard("Archived conversations", value: "\(metrics.archivedThreads)")
+            metricCard("Total messages", value: "\(metrics.totalMessages)")
+            metricCard("Avg messages/conversation", value: String(format: "%.1f", metrics.avgMessagesPerActiveThread))
+            metricCard("Assistant messages", value: "\(metrics.assistantMessages)")
+            metricCard("Source hit rate", value: "\(Int(metrics.sourceHitRate * 100))%")
+        }
+    }
+
+    private var topConversations: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Top Conversations")
+                .font(.headline)
+
+            if app.topChatThreadStats.isEmpty {
+                Text("No active conversations yet.")
+                    .foregroundStyle(.secondary)
+                    .font(.subheadline)
+            } else {
+                ForEach(app.topChatThreadStats) { stat in
+                    HStack(alignment: .top, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(stat.thread.title)
+                                .font(.subheadline.weight(.medium))
+                                .lineLimit(1)
+                            if !stat.thread.lastMessagePreview.isEmpty {
+                                Text(stat.thread.lastMessagePreview)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                                     .lineLimit(2)
-
-                                HStack(spacing: 4) {
-                                    Text(item.createdAt, style: .date)
-                                    Text("at")
-                                    Text(item.createdAt, style: .time)
-                                }
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-
-                                if !item.sources.isEmpty {
-                                    Text("\(item.sources.count) source\(item.sources.count == 1 ? "" : "s")")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
                             }
-                            .padding(.vertical, 4)
-                            .tag(item.id)
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 4) {
+                            Text("\(stat.messageCount) msgs")
+                                .font(.caption.weight(.semibold))
+                            Text("\(stat.userMessageCount) user / \(stat.assistantMessageCount) assistant")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
                         }
                     }
-                    .listStyle(.inset(alternatesRowBackgrounds: true))
+                    .padding(12)
+                    .background(Color.secondary.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
-
-                Divider()
-
-                HStack {
-                    Text("\(app.historyItems.count) queries")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-            }
-            .frame(minWidth: 240, idealWidth: 280)
-
-            // Detail panel
-            if let id = selectedId, let item = app.historyItems.first(where: { $0.id == id }) {
-                historyDetail(item)
-            } else {
-                VStack(spacing: 12) {
-                    Image(systemName: "clock.arrow.circlepath")
-                        .font(.system(size: 36))
-                        .foregroundStyle(.tertiary)
-                    Text("Select a question to view details")
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
 
-    private func historyDetail(_ item: QueryHistoryItem) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // Question
-                VStack(alignment: .leading, spacing: 6) {
-                    Label("Question", systemImage: "questionmark.circle")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(item.question)
-                        .font(.title3)
-                        .fontWeight(.medium)
-                        .textSelection(.enabled)
-                }
+    private func healthSection(metrics: KnowledgeStore.ChatAnalyticsSummary) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Quality Signals")
+                .font(.headline)
+            Text("Assistant responses with citations: \(metrics.assistantMessagesWithSources)/\(max(metrics.assistantMessages, 1))")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            if let mostRecent = metrics.mostRecentMessageAt {
+                Text("Most recent conversation activity: \(mostRecent.formatted(date: .abbreviated, time: .shortened))")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(14)
+        .background(Color.secondary.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
 
-                // Timestamp
-                HStack(spacing: 4) {
-                    Image(systemName: "calendar")
-                    Text(item.createdAt.formatted(date: .abbreviated, time: .shortened))
-                }
+    private func metricCard(_ title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-
-                Divider()
-
-                // Answer
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("Answer", systemImage: "lightbulb.fill")
-                        .font(.headline)
-
-                    Text(item.answerText)
-                        .textSelection(.enabled)
-                        .lineSpacing(4)
-                        .padding(16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.accentColor.opacity(0.06))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                }
-
-                // Sources
-                if !item.sources.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("Sources", systemImage: "doc.text.fill")
-                            .font(.headline)
-
-                        ForEach(item.sources) { src in
-                            HStack(alignment: .top, spacing: 10) {
-                                if let kid = src.knowledgeItemId, !app.itemExists(id: kid) {
-                                    Image(systemName: "exclamationmark.triangle")
-                                        .foregroundStyle(.orange)
-                                        .frame(width: 16)
-                                } else {
-                                    Image(systemName: src.url != nil ? "link" : "doc.text")
-                                        .foregroundStyle(.secondary)
-                                        .frame(width: 16)
-                                }
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    if let kid = src.knowledgeItemId, !app.itemExists(id: kid) {
-                                        Text("\(src.title) (deleted)")
-                                            .font(.subheadline)
-                                            .foregroundStyle(.secondary)
-                                            .strikethrough()
-                                    } else if let urlString = src.url, let url = URL(string: urlString) {
-                                        Link(destination: url) {
-                                            Text(src.title)
-                                                .font(.subheadline)
-                                                .lineLimit(1)
-                                        }
-                                    } else {
-                                        Text(src.title)
-                                            .font(.subheadline)
-                                    }
-                                }
-                            }
-                            .padding(.vertical, 4)
-                            .padding(.horizontal, 10)
-                            .background(Color.secondary.opacity(0.04))
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                        }
-                    }
-                }
-            }
-            .padding(24)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            Text(value)
+                .font(.title3.weight(.semibold))
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Color.secondary.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }

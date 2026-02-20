@@ -1,5 +1,5 @@
 const { appendSavedUrl } = require('../lib/store');
-const { requireApiKey, checkRateLimit, enforceIdempotency, idempotencyKeyFrom } = require('../lib/security');
+const { requireWriteAuth, checkRateLimit, enforceIdempotency, idempotencyKeyFrom } = require('../lib/security');
 
 function parseBody(req) {
   if (!req.body) return {};
@@ -28,7 +28,7 @@ function toUrlOrSearch(input) {
       return null;
     }
   }
-  return `https://duckduckgo.com/?q=${encodeURIComponent(value)}`;
+  return null;
 }
 
 module.exports = async (req, res) => {
@@ -36,7 +36,7 @@ module.exports = async (req, res) => {
     res.status(405).end();
     return;
   }
-  if (!requireApiKey(req, res)) return;
+  if (!requireWriteAuth(req, res)) return;
   if (!(await checkRateLimit(req, res, 'offline-save', 180))) return;
 
   try {

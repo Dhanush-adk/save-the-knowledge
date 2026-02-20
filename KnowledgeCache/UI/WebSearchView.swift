@@ -2,7 +2,7 @@
 //  WebSearchView.swift
 //  KnowledgeCache
 //
-//  Browse the web (DuckDuckGo search or any URL). "Save to offline" stores the
+//  Browse the web (URL navigation only). "Save to offline" stores the
 //  current page in the local knowledge base for later search. No paid APIs.
 //
 
@@ -33,16 +33,69 @@ struct WebSearchView: View {
     @State private var hasLoadedInitial = false
     @State private var tabs: [BrowserTab] = []
     @State private var selectedTabID: UUID?
+    @State private var browserNotice: String?
     @FocusState private var isSearchFocused: Bool
+    private let starterURLs: [String] = [
+        "https://www.google.com",
+        "https://www.mozilla.org",
+        "https://news.ycombinator.com",
+        "https://www.apple.com/newsroom",
+        "https://en.wikipedia.org/wiki/Artificial_intelligence",
+        "https://developer.apple.com/documentation"
+    ]
 
-    private static let duckDuckGoBase = "https://duckduckgo.com/"
-    private static let searchEngineHosts = ["duckduckgo.com", "google.com", "bing.com", "www.duckduckgo.com", "www.google.com", "www.bing.com"]
-    private var initialURL: URL { URL(string: Self.duckDuckGoBase)! }
+    private var initialURL: URL {
+        let html = """
+        <!doctype html>
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <title>Save the Knowledge Browser</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; background: #ffffff; color: #111827; }
+              .wrap { max-width: 760px; margin: 10vh auto; padding: 24px; text-align: center; }
+              h1 { margin: 0 0 10px; font-size: 2rem; }
+              p { color: #4b5563; line-height: 1.45; }
+              .box { margin-top: 22px; padding: 16px; border: 1px solid #e5e7eb; border-radius: 10px; background: #f9fafb; }
+            </style>
+          </head>
+          <body>
+            <div class="wrap">
+              <h1>Save the Knowledge Browser</h1>
+              <p>Enter a URL in the address bar to browse and save pages for offline use.</p>
+              <div class="box">
+                You can search the web directly from the address bar.<br/>
+                Save useful pages, then use the <b>Search</b> tab to ask questions from your offline knowledge base.
+              </div>
+            </div>
+          </body>
+        </html>
+        """
+        let encoded = Data(html.utf8).base64EncodedString()
+        return URL(string: "data:text/html;base64,\(encoded)") ?? URL(string: "about:blank")!
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             tabStrip
             toolbar
+            if shouldShowWebOnboarding {
+                webOnboardingCard
+            }
+            if let notice = browserNotice, !notice.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: "info.circle.fill")
+                        .foregroundStyle(.blue)
+                    Text(notice)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color.blue.opacity(0.08))
+            }
             if app.isSaveInProgress || app.saveError != nil || saveSuccessVisible || app.saveJobState != .idle {
                 saveStatusBanner
             }
@@ -50,10 +103,20 @@ struct WebSearchView: View {
             ZStack {
                 ForEach(tabs) { tab in
                     BrowserWebView(
+                        tabId: tab.id,
                         urlToLoad: binding(for: tab.id, keyPath: \.pendingLoadURL),
                         currentURL: binding(for: tab.id, keyPath: \.currentURL),
                         isLoading: binding(for: tab.id, keyPath: \.isLoading),
-                        pageTitle: binding(for: tab.id, keyPath: \.title)
+                        pageTitle: binding(for: tab.id, keyPath: \.title),
+                        onNavigationStarted: { url in
+                            app.browserNavigationStarted(tabId: tab.id, url: url)
+                        },
+                        onNavigationFinished: { url in
+                            app.browserNavigationFinished(tabId: tab.id, url: url)
+                        },
+                        onScrollChanged: { scrollPct in
+                            app.browserScrollUpdated(tabId: tab.id, scrollPct: scrollPct)
+                        }
                     )
                     .opacity(tab.id == selectedTabID ? 1 : 0)
                     .allowsHitTesting(tab.id == selectedTabID)
@@ -79,18 +142,16 @@ struct WebSearchView: View {
                 let first = BrowserTab(initialURL: initialURL)
                 tabs = [first]
                 selectedTabID = first.id
-                searchOrURL = initialURL.absoluteString
+                searchOrURL = ""
             }
         }
         .onChange(of: selectedTabID) { _, newID in
             guard let id = newID, let idx = tabs.firstIndex(where: { $0.id == id }) else { return }
-            searchOrURL = tabs[idx].currentURL?.absoluteString ?? ""
+            searchOrURL = displayAddress(for: tabs[idx].currentURL)
         }
         .onChange(of: tabs) { _, _ in
             guard let tab = selectedTab else { return }
-            if let u = tab.currentURL {
-                searchOrURL = u.absoluteString
-            }
+            searchOrURL = displayAddress(for: tab.currentURL)
         }
     }
 
@@ -161,10 +222,12 @@ struct WebSearchView: View {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
-                TextField("Search or enter URL", text: $searchOrURL)
+                TextField("Paste URL (example.com/article)", text: $searchOrURL)
+                    .accessibilityLabel("Address bar")
                     .textFieldStyle(.plain)
                     .onSubmit { loadSearchOrURL() }
                     .focused($isSearchFocused)
+                    .help("Web tab accepts URLs only. Example: https://example.com/page")
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
@@ -260,8 +323,57 @@ struct WebSearchView: View {
     private var canSaveCurrentPage: Bool {
         guard let url = selectedTab?.currentURL else { return false }
         guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return false }
-        guard let host = url.host?.lowercased() else { return false }
-        return !Self.searchEngineHosts.contains(host)
+        return url.host != nil
+    }
+
+    private var shouldShowWebOnboarding: Bool {
+        guard let url = selectedTab?.currentURL else { return true }
+        let scheme = url.scheme?.lowercased() ?? ""
+        return scheme == "data" || scheme == "about"
+    }
+
+    private var webOnboardingCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Start with a URL")
+                .font(.headline)
+            Text("This tab is for browsing pages by URL. Paste a page link first, open it, then click Save to offline.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("1. Paste a URL in the address bar")
+                Text("2. Open the page")
+                Text("3. Click Save to offline")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+            Text("Try one of these")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(starterURLs, id: \.self) { url in
+                        Button(action: { openStarterURL(url) }) {
+                            Text(url.replacingOccurrences(of: "https://", with: ""))
+                                .font(.caption)
+                                .lineLimit(1)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color.accentColor.opacity(0.12))
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .help("Open \(url)")
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.accentColor.opacity(0.06))
     }
 
     private func loadSearchOrURL() {
@@ -271,14 +383,15 @@ struct WebSearchView: View {
         if let url = parseAsURL(input) {
             tabs[idx].pendingLoadURL = url
             tabs[idx].currentURL = url
+            browserNotice = nil
         } else {
-            var allowed = CharacterSet.urlQueryAllowed
-            allowed.remove(charactersIn: " ")
-            let query = input.addingPercentEncoding(withAllowedCharacters: allowed) ?? input
-            let searchURL = URL(string: Self.duckDuckGoBase + "?q=" + query)!
-            tabs[idx].pendingLoadURL = searchURL
-            tabs[idx].currentURL = searchURL
+            browserNotice = "Web tab takes URLs only. Paste a full URL such as https://example.com/article"
         }
+    }
+
+    private func openStarterURL(_ raw: String) {
+        searchOrURL = raw
+        loadSearchOrURL()
     }
 
     private func parseAsURL(_ input: String) -> URL? {
@@ -287,9 +400,21 @@ struct WebSearchView: View {
             if !s.hasPrefix("http://") && !s.hasPrefix("https://") {
                 s = "https://" + s
             }
-            return URL(string: s)
+            guard let u = URL(string: s), let scheme = u.scheme?.lowercased(), (scheme == "http" || scheme == "https") else {
+                return nil
+            }
+            return u
         }
         return nil
+    }
+
+    private func displayAddress(for url: URL?) -> String {
+        guard let url = url else { return "" }
+        let scheme = url.scheme?.lowercased() ?? ""
+        if scheme == "data" || scheme == "about" {
+            return ""
+        }
+        return url.absoluteString
     }
 
     private func goBack() {
@@ -325,16 +450,17 @@ struct WebSearchView: View {
         let tab = BrowserTab(initialURL: initialURL)
         tabs.append(tab)
         selectedTabID = tab.id
-        searchOrURL = initialURL.absoluteString
+        searchOrURL = ""
     }
 
     private func closeTab(_ id: UUID) {
+        app.browserTabClosed(tabId: id)
         tabs.removeAll { $0.id == id }
         if tabs.isEmpty {
             let tab = BrowserTab(initialURL: initialURL)
             tabs = [tab]
             selectedTabID = tab.id
-            searchOrURL = initialURL.absoluteString
+            searchOrURL = ""
             return
         }
         if selectedTabID == id {
@@ -346,6 +472,9 @@ struct WebSearchView: View {
         if tab.isLoading { return "Loading..." }
         if !tab.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, tab.title != "New Tab" {
             return tab.title
+        }
+        if tab.currentURL?.scheme == "data" || tab.currentURL?.scheme == "about" {
+            return "Start"
         }
         return tab.currentURL?.host ?? "New Tab"
     }
@@ -375,19 +504,25 @@ extension Notification.Name {
 // MARK: - WKWebView Representable
 
 struct BrowserWebView: NSViewRepresentable {
+    let tabId: UUID
     @Binding var urlToLoad: URL?
     @Binding var currentURL: URL?
     @Binding var isLoading: Bool
     @Binding var pageTitle: String
+    let onNavigationStarted: (URL) -> Void
+    let onNavigationFinished: (URL) -> Void
+    let onScrollChanged: (Double) -> Void
 
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.processPool = WKProcessPool()
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
+        webView.configuration.userContentController.add(context.coordinator, name: "kcScroll")
         webView.allowsBackForwardNavigationGestures = true
         context.coordinator.webView = webView
         context.coordinator.setupNotifications()
+        context.coordinator.installScrollObserverScript(in: webView)
         return webView
     }
 
@@ -401,20 +536,44 @@ struct BrowserWebView: NSViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(currentURL: $currentURL, isLoading: $isLoading, pageTitle: $pageTitle)
+        Coordinator(
+            tabId: tabId,
+            currentURL: $currentURL,
+            isLoading: $isLoading,
+            pageTitle: $pageTitle,
+            onNavigationStarted: onNavigationStarted,
+            onNavigationFinished: onNavigationFinished,
+            onScrollChanged: onScrollChanged
+        )
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+        let tabId: UUID
         @Binding var currentURL: URL?
         @Binding var isLoading: Bool
         @Binding var pageTitle: String
+        let onNavigationStarted: (URL) -> Void
+        let onNavigationFinished: (URL) -> Void
+        let onScrollChanged: (Double) -> Void
         weak var webView: WKWebView?
         var pendingURL: URL?
 
-        init(currentURL: Binding<URL?>, isLoading: Binding<Bool>, pageTitle: Binding<String>) {
+        init(
+            tabId: UUID,
+            currentURL: Binding<URL?>,
+            isLoading: Binding<Bool>,
+            pageTitle: Binding<String>,
+            onNavigationStarted: @escaping (URL) -> Void,
+            onNavigationFinished: @escaping (URL) -> Void,
+            onScrollChanged: @escaping (Double) -> Void
+        ) {
+            self.tabId = tabId
             _currentURL = currentURL
             _isLoading = isLoading
             _pageTitle = pageTitle
+            self.onNavigationStarted = onNavigationStarted
+            self.onNavigationFinished = onNavigationFinished
+            self.onScrollChanged = onScrollChanged
         }
 
         func setupNotifications() {
@@ -453,6 +612,9 @@ struct BrowserWebView: NSViewRepresentable {
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
             pendingURL = webView.url
             isLoading = true
+            if let url = webView.url {
+                onNavigationStarted(url)
+            }
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -460,6 +622,10 @@ struct BrowserWebView: NSViewRepresentable {
             let url = webView.url
             currentURL = url
             pageTitle = webView.title ?? url?.host ?? "New Tab"
+            if let url {
+                onNavigationFinished(url)
+            }
+            injectCurrentScrollPosition(webView: webView)
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -470,6 +636,43 @@ struct BrowserWebView: NSViewRepresentable {
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
             isLoading = false
             currentURL = nil
+        }
+
+        func installScrollObserverScript(in webView: WKWebView) {
+            let source = """
+            if (!window.__kcScrollObserver) {
+              window.__kcScrollObserver = true;
+              window.addEventListener('scroll', function () {
+                var doc = document.documentElement || document.body;
+                var max = Math.max(1, doc.scrollHeight - window.innerHeight);
+                var pct = Math.max(0, Math.min(100, (window.scrollY / max) * 100));
+                window.webkit.messageHandlers.kcScroll.postMessage(pct);
+              }, { passive: true });
+            }
+            """
+            let script = WKUserScript(source: source, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+            webView.configuration.userContentController.addUserScript(script)
+        }
+
+        private func injectCurrentScrollPosition(webView: WKWebView) {
+            let source = """
+            (function() {
+              var doc = document.documentElement || document.body;
+              var max = Math.max(1, doc.scrollHeight - window.innerHeight);
+              var pct = Math.max(0, Math.min(100, (window.scrollY / max) * 100));
+              window.webkit.messageHandlers.kcScroll.postMessage(pct);
+            })();
+            """
+            webView.evaluateJavaScript(source, completionHandler: nil)
+        }
+
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            guard message.name == "kcScroll" else { return }
+            if let pct = message.body as? Double {
+                onScrollChanged(pct)
+            } else if let pct = message.body as? NSNumber {
+                onScrollChanged(pct.doubleValue)
+            }
         }
     }
 }

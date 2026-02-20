@@ -47,14 +47,18 @@ This repo is the cloud companion service and dashboard:
 - Stores feedback payload and optionally forwards to webhook.
 4. `POST /api/analytics`:
 - Stores minimal usage event payload.
-5. `POST /api/offline-save`:
+5. `POST /api/issues`:
+- Stores operational issue/error events raised by app clients when online.
+6. `GET /api/app-version`:
+- Returns latest app version metadata for in-app upgrade prompts.
+7. `POST /api/offline-save`:
 - Stores a URL capture request from the browser shell (foundation for offline indexing queue).
-6. `GET /api/investor-kpis`:
+8. `GET /api/investor-kpis`:
 - Returns aggregated KPI metrics (funnel, retention estimates, latency, storage efficiency, daily trend).
 - Includes operational SLO/alert block under `ops` (24h window) for query reliability and queue sync health.
-7. `GET /api/investor-export?period=weekly|monthly&format=json|csv`:
+9. `GET /api/investor-export?period=weekly|monthly&format=json|csv`:
 - Returns investor snapshot exports for reporting cadence.
-8. `GET /api/retention-export?format=json|csv`:
+10. `GET /api/retention-export?format=json|csv`:
 - Returns cohort-level retention exports (D1/D7) for investor reporting and dashboard views.
 - Supports optional filters: `from`, `to`, `install_id`, `event`.
 
@@ -65,6 +69,7 @@ This repo is the cloud companion service and dashboard:
 3. Current limits:
 - Analytics: latest 200 entries.
 - Feedback: latest 200 entries.
+- Issues: latest 200 entries.
 
 ## Local Development
 

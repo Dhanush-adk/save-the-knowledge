@@ -1,13 +1,13 @@
 const { appendAnalytics } = require('../lib/store');
-const { requireApiKey, checkRateLimit, enforceIdempotency, idempotencyKeyFrom } = require('../lib/security');
+const { requireWriteAuth, checkRateLimit, enforceIdempotency, idempotencyKeyFrom } = require('../lib/security');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     res.status(405).end();
     return;
   }
-  if (!requireApiKey(req, res)) return;
-  if (!(await checkRateLimit(req, res, 'analytics', 240))) return;
+  if (!requireWriteAuth(req, res)) return;
+  if (!(await checkRateLimit(req, res, 'analytics'))) return;
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
     const idemKey = idempotencyKeyFrom(req, body, 'analytics');
@@ -36,6 +36,6 @@ module.exports = async (req, res) => {
     res.status(200).json({ ok: true });
   } catch (e) {
     console.error('[analytics]', e);
-    res.status(200).json({ ok: true });
+    res.status(500).json({ ok: false, error: 'analytics_write_failed' });
   }
 };

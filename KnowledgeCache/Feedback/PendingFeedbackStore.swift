@@ -6,6 +6,8 @@
 //
 
 import Foundation
+import CryptoKit
+import Security
 
 struct FeedbackItem: Codable {
     let id: String
@@ -39,11 +41,20 @@ final class PendingFeedbackStore {
 
     func load() -> [FeedbackItem] {
         guard FileManager.default.fileExists(atPath: fileURL.path),
-              let data = try? Data(contentsOf: fileURL),
-              let list = try? JSONDecoder().decode([FeedbackItem].self, from: data) else {
+              let rawData = try? Data(contentsOf: fileURL) else {
             return []
         }
-        return list
+        if let decrypted = QueueCrypto.decrypt(rawData),
+           let list = try? JSONDecoder().decode([FeedbackItem].self, from: decrypted) {
+            return list
+        }
+
+        // Legacy plaintext migration path: read once, then rewrite encrypted.
+        if let legacyList = try? JSONDecoder().decode([FeedbackItem].self, from: rawData) {
+            save(legacyList)
+            return legacyList
+        }
+        return []
     }
 
     func remove(ids: Set<String>) {
@@ -79,8 +90,12 @@ final class PendingFeedbackStore {
     }
 
     private func save(_ list: [FeedbackItem]) {
-        guard let data = try? JSONEncoder().encode(list) else { return }
-        try? data.write(to: fileURL)
+        guard let plain = try? JSONEncoder().encode(list) else { return }
+        guard let encrypted = QueueCrypto.encrypt(plain) else {
+            AppLogger.error("PendingFeedbackStore: failed to encrypt queue payload; skip write")
+            return
+        }
+        try? encrypted.write(to: fileURL, options: .atomic)
     }
 
     private static func parseTimestamp(_ raw: String) -> Date? {
@@ -90,5 +105,103 @@ final class PendingFeedbackStore {
         let plain = ISO8601DateFormatter()
         plain.formatOptions = [.withInternetDateTime]
         return plain.date(from: raw)
+    }
+}
+
+private enum QueueCrypto {
+    private struct Envelope: Codable {
+        let v: Int
+        let combined: String
+    }
+
+    static func encrypt(_ plain: Data) -> Data? {
+        guard let key = QueueCryptoKeychain.loadOrCreateKey() else { return nil }
+        guard let sealed = try? AES.GCM.seal(plain, using: key),
+              let combined = sealed.combined else { return nil }
+        let payload = Envelope(v: 1, combined: combined.base64EncodedString())
+        return try? JSONEncoder().encode(payload)
+    }
+
+    static func decrypt(_ raw: Data) -> Data? {
+        guard let payload = try? JSONDecoder().decode(Envelope.self, from: raw),
+              payload.v == 1,
+              let combined = Data(base64Encoded: payload.combined),
+              let key = QueueCryptoKeychain.loadOrCreateKey(),
+              let box = try? AES.GCM.SealedBox(combined: combined),
+              let opened = try? AES.GCM.open(box, using: key) else {
+            return nil
+        }
+        return opened
+    }
+}
+
+private enum QueueCryptoKeychain {
+    private static let service = "com.knowledgecache.feedbackqueue"
+    private static let account = "pending_feedback_key_v1"
+    private static let cacheLock = NSLock()
+    private static var cachedKeyData: Data?
+
+    static func loadOrCreateKey() -> SymmetricKey? {
+        cacheLock.lock()
+        if let cachedKeyData, cachedKeyData.count == 32 {
+            cacheLock.unlock()
+            return SymmetricKey(data: cachedKeyData)
+        }
+        cacheLock.unlock()
+
+        if let existing = readKeyData(), existing.count == 32 {
+            cacheLock.lock()
+            cachedKeyData = existing
+            cacheLock.unlock()
+            return SymmetricKey(data: existing)
+        }
+        var bytes = Data(count: 32)
+        let status = bytes.withUnsafeMutableBytes { ptr in
+            SecRandomCopyBytes(kSecRandomDefault, 32, ptr.baseAddress!)
+        }
+        guard status == errSecSuccess else { return nil }
+        guard storeKeyData(bytes) else { return nil }
+        cacheLock.lock()
+        cachedKeyData = bytes
+        cacheLock.unlock()
+        return SymmetricKey(data: bytes)
+    }
+
+    private static func readKeyData() -> Data? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess else { return nil }
+        return result as? Data
+    }
+
+    private static func storeKeyData(_ data: Data) -> Bool {
+        let attrs: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
+        ]
+        let addStatus = SecItemAdd(attrs as CFDictionary, nil)
+        if addStatus == errSecSuccess { return true }
+        if addStatus == errSecDuplicateItem {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrAccount as String: account
+            ]
+            let updates: [String: Any] = [
+                kSecValueData as String: data
+            ]
+            return SecItemUpdate(query as CFDictionary, updates as CFDictionary) == errSecSuccess
+        }
+        return false
     }
 }

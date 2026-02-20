@@ -14,7 +14,12 @@
   <header>
     <nav>
       <a href="#" class="logo">Save the Knowledge</a>
-      <a href="#download" class="nav-cta">Download</a>
+      <div class="nav-actions">
+        <a href="#about" class="nav-link">About</a>
+        <a href="#install" class="nav-link">Install</a>
+        <a href="https://github.com/YOUR_GITHUB_USER/knowledge-cache" class="nav-link" target="_blank" rel="noopener">GitHub</a>
+        <a href="#download" class="nav-cta">Download</a>
+      </div>
     </nav>
   </header>
 
@@ -50,6 +55,54 @@
           <p>No cloud. No accounts. No data leaves your machine. Works after the first URL fetch.</p>
         </div>
       </div>
+    </section>
+
+    <section class="about" id="about">
+      <h2>About the project</h2>
+      <p class="about-lead">Save the Knowledge is an open-source, offline-first macOS app for building a private, searchable knowledge base from pages and notes you save.</p>
+      <div class="about-grid">
+        <div class="about-card">
+          <h3>Local-first by design</h3>
+          <p>Your saved knowledge is indexed and searched on-device with citation-backed answers.</p>
+        </div>
+        <div class="about-card">
+          <h3>Grounded answers</h3>
+          <p>Chat prioritizes your knowledge base. Optional Ollama can enhance responses while keeping local control.</p>
+        </div>
+        <div class="about-card">
+          <h3>Open-source roadmap</h3>
+          <p>Built with SwiftUI + SQLite architecture, documented for contributors and production packaging.</p>
+        </div>
+      </div>
+      <p class="about-links">
+        <a href="https://github.com/YOUR_GITHUB_USER/knowledge-cache/blob/main/README.md" target="_blank" rel="noopener">Readme</a>
+        <span>•</span>
+        <a href="https://github.com/YOUR_GITHUB_USER/knowledge-cache/blob/main/docs/PROJECT-OVERVIEW.md" target="_blank" rel="noopener">Project Overview</a>
+      </p>
+    </section>
+
+    <section class="install" id="install">
+      <h2>Installation</h2>
+      <p class="install-lead">Choose the setup path that matches your workflow.</p>
+      <div class="install-grid">
+        <div class="install-card">
+          <h3>Build from source</h3>
+          <pre><code>xcodegen generate
+xcodebuild -project KnowledgeCache.xcodeproj \
+  -scheme KnowledgeCache \
+  -destination 'platform=macOS' build</code></pre>
+        </div>
+        <div class="install-card">
+          <h3>Homebrew (planned/open-source dist)</h3>
+          <pre><code>brew tap YOUR_GITHUB_USER/save-the-knowledge
+brew install save-the-knowledge</code></pre>
+        </div>
+      </div>
+      <p class="about-links">
+        <a href="https://github.com/YOUR_GITHUB_USER/knowledge-cache/blob/main/docs/INSTALLATION.md" target="_blank" rel="noopener">Full Installation Guide</a>
+        <span>•</span>
+        <a href="https://github.com/YOUR_GITHUB_USER/knowledge-cache/blob/main/docs/HOMEBREW-DISTRIBUTION.md" target="_blank" rel="noopener">Homebrew Distribution</a>
+      </p>
     </section>
 
     <section class="cases">
@@ -96,7 +149,7 @@
         <a href="#" class="cta-download" id="download-btn">Download Save the Knowledge</a>
         <p class="download-hint">Drag to Applications after download</p>
       </div>
-      <p class="download-alt">Or: <code>brew install --cask savetheknowledge</code></p>
+      <p class="download-alt">Or: <code>brew install --cask save-the-knowledge</code></p>
     </section>
 
     <footer class="footer">

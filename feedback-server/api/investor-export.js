@@ -1,11 +1,14 @@
 const { readData } = require('../lib/store');
 const { generateInvestorSnapshots, investorSnapshotsToCsv } = require('../lib/kpis');
+const { requireDashboardAccess, checkRateLimit } = require('../lib/security');
 
 module.exports = async (req, res) => {
   if (req.method !== 'GET') {
     res.status(405).end();
     return;
   }
+  if (!requireDashboardAccess(req, res)) return;
+  if (!(await checkRateLimit(req, res, 'investor_export'))) return;
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const period = (url.searchParams.get('period') || 'weekly').toLowerCase();
@@ -16,7 +19,8 @@ module.exports = async (req, res) => {
     const data = await readData();
     const exportData = generateInvestorSnapshots(data.analytics || [], safePeriod);
 
-    res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
+    // Authenticated dashboard data should never be cached by shared proxies/edges.
+    res.setHeader('Cache-Control', 'private, no-store');
     if (safeFormat === 'csv') {
       const csv = investorSnapshotsToCsv(exportData);
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');

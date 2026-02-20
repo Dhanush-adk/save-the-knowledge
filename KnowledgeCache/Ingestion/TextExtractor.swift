@@ -287,6 +287,7 @@ final class TextExtractor {
             .replacingOccurrences(of: "&quot;", with: "\"")
             .decodeHTMLEntities()
     }
+
 }
 
 private extension String {

@@ -9,11 +9,42 @@ import Foundation
 import SQLite3
 
 final class KnowledgeStore: @unchecked Sendable {
+    struct ChatAnalyticsSummary {
+        let activeThreads: Int
+        let archivedThreads: Int
+        let totalMessages: Int
+        let userMessages: Int
+        let assistantMessages: Int
+        let assistantMessagesWithSources: Int
+        let sourceHitRate: Double
+        let avgMessagesPerActiveThread: Double
+        let mostRecentMessageAt: Date?
+    }
+
+    struct ChatThreadStat: Identifiable {
+        let thread: ChatThread
+        let messageCount: Int
+        let userMessageCount: Int
+        let assistantMessageCount: Int
+
+        var id: UUID { thread.id }
+    }
+
     struct StorageTotals {
         let itemsCount: Int
         let chunksCount: Int
         let rawBytesTotal: Int
         let storedBytesTotal: Int
+    }
+
+    struct PageVisit: Sendable {
+        let id: UUID
+        let url: String
+        let tabId: UUID?
+        let startedAt: Date
+        let endedAt: Date?
+        let dwellMs: Int
+        let scrollPct: Double
     }
 
     private let db: Database
@@ -91,6 +122,29 @@ final class KnowledgeStore: @unchecked Sendable {
                     throw StoreError.insertFailed
                 }
             }
+        }
+    }
+
+    func updateItemCaptureMetadata(
+        itemId: UUID,
+        canonicalURL: String?,
+        savedFrom: String,
+        savedAt: Date,
+        fullSnapshotPath: String?
+    ) throws {
+        let stmt = try db.prepare("""
+            UPDATE knowledge_items
+            SET canonical_url = ?, saved_from = ?, saved_at = ?, full_snapshot_path = ?
+            WHERE id = ?
+            """)
+        defer { sqlite3_finalize(stmt) }
+        bindOptionalText(stmt, index: 1, value: canonicalURL)
+        bindText(stmt, index: 2, value: savedFrom)
+        sqlite3_bind_double(stmt, 3, savedAt.timeIntervalSince1970)
+        bindOptionalText(stmt, index: 4, value: fullSnapshotPath)
+        bindText(stmt, index: 5, value: itemId.uuidString)
+        if sqlite3_step(stmt) != SQLITE_DONE {
+            throw StoreError.insertFailed
         }
     }
 
@@ -191,6 +245,81 @@ final class KnowledgeStore: @unchecked Sendable {
         }
     }
 
+    func searchChunksFTS(query: String, limit: Int = 40) throws -> [(chunkId: String, rank: Double)] {
+        let normalized = query
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .split { $0.isWhitespace }
+            .map { String($0).replacingOccurrences(of: "\"", with: "") }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        guard !normalized.isEmpty else { return [] }
+
+        let stmt = try db.prepare("""
+            SELECT chunk_id, bm25(chunks_fts) AS rank
+            FROM chunks_fts
+            WHERE chunks_fts MATCH ?
+            ORDER BY rank
+            LIMIT ?
+            """)
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, index: 1, value: normalized)
+        sqlite3_bind_int(stmt, 2, Int32(max(1, limit)))
+        var out: [(chunkId: String, rank: Double)] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let chunkPtr = sqlite3_column_text(stmt, 0) else { continue }
+            let chunkId = String(cString: chunkPtr)
+            let rank = sqlite3_column_double(stmt, 1)
+            out.append((chunkId: chunkId, rank: rank))
+        }
+        return out
+    }
+
+    func insertPageVisit(_ visit: PageVisit) throws {
+        let stmt = try db.prepare("""
+            INSERT INTO page_visits (id, url, tab_id, started_at, ended_at, dwell_ms, scroll_pct)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """)
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, index: 1, value: visit.id.uuidString)
+        bindText(stmt, index: 2, value: visit.url)
+        bindOptionalText(stmt, index: 3, value: visit.tabId?.uuidString)
+        sqlite3_bind_double(stmt, 4, visit.startedAt.timeIntervalSince1970)
+        if let endedAt = visit.endedAt {
+            sqlite3_bind_double(stmt, 5, endedAt.timeIntervalSince1970)
+        } else {
+            sqlite3_bind_null(stmt, 5)
+        }
+        sqlite3_bind_int(stmt, 6, Int32(max(0, visit.dwellMs)))
+        sqlite3_bind_double(stmt, 7, max(0, min(100, visit.scrollPct)))
+        if sqlite3_step(stmt) != SQLITE_DONE {
+            throw StoreError.insertFailed
+        }
+    }
+
+    func insertSnapshot(
+        itemId: UUID,
+        type: String,
+        path: String,
+        sizeBytes: Int,
+        contentHash: String?
+    ) throws {
+        let stmt = try db.prepare("""
+            INSERT INTO snapshots (id, knowledge_item_id, type, path, size_bytes, content_hash, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """)
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, index: 1, value: UUID().uuidString)
+        bindText(stmt, index: 2, value: itemId.uuidString)
+        bindText(stmt, index: 3, value: type)
+        bindText(stmt, index: 4, value: path)
+        sqlite3_bind_int64(stmt, 5, sqlite3_int64(max(0, sizeBytes)))
+        bindOptionalText(stmt, index: 6, value: contentHash)
+        sqlite3_bind_double(stmt, 7, Date().timeIntervalSince1970)
+        if sqlite3_step(stmt) != SQLITE_DONE {
+            throw StoreError.insertFailed
+        }
+    }
+
     func optimizeStorage() throws {
         try db.optimizeStorage()
     }
@@ -285,7 +414,374 @@ final class KnowledgeStore: @unchecked Sendable {
         return items
     }
 
+    // MARK: - Chat threads/messages
+
+    func insertChatThread(_ thread: ChatThread) throws {
+        let stmt = try db.prepare("""
+            INSERT INTO chat_threads (id, title, created_at, updated_at, last_message_preview, archived_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """)
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, index: 1, value: thread.id.uuidString)
+        bindText(stmt, index: 2, value: thread.title)
+        sqlite3_bind_double(stmt, 3, thread.createdAt.timeIntervalSince1970)
+        sqlite3_bind_double(stmt, 4, thread.updatedAt.timeIntervalSince1970)
+        bindText(stmt, index: 5, value: thread.lastMessagePreview)
+        if let archivedAt = thread.archivedAt {
+            sqlite3_bind_double(stmt, 6, archivedAt.timeIntervalSince1970)
+        } else {
+            sqlite3_bind_null(stmt, 6)
+        }
+        if sqlite3_step(stmt) != SQLITE_DONE {
+            throw StoreError.insertFailed
+        }
+    }
+
+    func updateChatThread(
+        threadId: UUID,
+        title: String? = nil,
+        updatedAt: Date = Date(),
+        lastMessagePreview: String? = nil,
+        archivedAt: Date? = nil
+    ) throws {
+        let stmt = try db.prepare("""
+            UPDATE chat_threads
+            SET title = COALESCE(?, title),
+                updated_at = ?,
+                last_message_preview = COALESCE(?, last_message_preview),
+                archived_at = COALESCE(?, archived_at)
+            WHERE id = ?
+            """)
+        defer { sqlite3_finalize(stmt) }
+        bindOptionalText(stmt, index: 1, value: title)
+        sqlite3_bind_double(stmt, 2, updatedAt.timeIntervalSince1970)
+        bindOptionalText(stmt, index: 3, value: lastMessagePreview)
+        if let archivedAt {
+            sqlite3_bind_double(stmt, 4, archivedAt.timeIntervalSince1970)
+        } else {
+            sqlite3_bind_null(stmt, 4)
+        }
+        bindText(stmt, index: 5, value: threadId.uuidString)
+        if sqlite3_step(stmt) != SQLITE_DONE {
+            throw StoreError.insertFailed
+        }
+    }
+
+    func fetchChatThreads(limit: Int = 200) throws -> [ChatThread] {
+        let stmt = try db.prepare("""
+            SELECT id, title, created_at, updated_at, last_message_preview, archived_at
+            FROM chat_threads
+            WHERE archived_at IS NULL
+            ORDER BY updated_at DESC
+            LIMIT ?
+            """)
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_int(stmt, 1, Int32(max(1, limit)))
+        var out: [ChatThread] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let id = UUID(uuidString: String(cString: sqlite3_column_text(stmt, 0))) ?? UUID()
+            let title = String(cString: sqlite3_column_text(stmt, 1))
+            let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 2))
+            let updatedAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 3))
+            let preview = sqlite3_column_text(stmt, 4).map { String(cString: $0) } ?? ""
+            let archivedAt: Date?
+            if sqlite3_column_type(stmt, 5) != SQLITE_NULL {
+                archivedAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 5))
+            } else {
+                archivedAt = nil
+            }
+            out.append(
+                ChatThread(
+                    id: id,
+                    title: title,
+                    createdAt: createdAt,
+                    updatedAt: updatedAt,
+                    lastMessagePreview: preview,
+                    archivedAt: archivedAt
+                )
+            )
+        }
+        return out
+    }
+
+    func fetchArchivedChatThreads(limit: Int = 200) throws -> [ChatThread] {
+        let stmt = try db.prepare("""
+            SELECT id, title, created_at, updated_at, last_message_preview, archived_at
+            FROM chat_threads
+            WHERE archived_at IS NOT NULL
+            ORDER BY archived_at DESC, updated_at DESC
+            LIMIT ?
+            """)
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_int(stmt, 1, Int32(max(1, limit)))
+        var out: [ChatThread] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let id = UUID(uuidString: String(cString: sqlite3_column_text(stmt, 0))) ?? UUID()
+            let title = String(cString: sqlite3_column_text(stmt, 1))
+            let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 2))
+            let updatedAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 3))
+            let preview = sqlite3_column_text(stmt, 4).map { String(cString: $0) } ?? ""
+            let archivedAt: Date?
+            if sqlite3_column_type(stmt, 5) != SQLITE_NULL {
+                archivedAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 5))
+            } else {
+                archivedAt = nil
+            }
+            out.append(
+                ChatThread(
+                    id: id,
+                    title: title,
+                    createdAt: createdAt,
+                    updatedAt: updatedAt,
+                    lastMessagePreview: preview,
+                    archivedAt: archivedAt
+                )
+            )
+        }
+        return out
+    }
+
+    func deleteChatThread(threadId: UUID) throws {
+        let stmt = try db.prepare("DELETE FROM chat_threads WHERE id = ?")
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, index: 1, value: threadId.uuidString)
+        if sqlite3_step(stmt) != SQLITE_DONE {
+            throw StoreError.insertFailed
+        }
+    }
+
+    func archiveChatThread(threadId: UUID, at date: Date = Date()) throws {
+        let stmt = try db.prepare("""
+            UPDATE chat_threads
+            SET archived_at = ?, updated_at = ?
+            WHERE id = ?
+            """)
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_double(stmt, 1, date.timeIntervalSince1970)
+        sqlite3_bind_double(stmt, 2, date.timeIntervalSince1970)
+        bindText(stmt, index: 3, value: threadId.uuidString)
+        if sqlite3_step(stmt) != SQLITE_DONE {
+            throw StoreError.insertFailed
+        }
+    }
+
+    func unarchiveChatThread(threadId: UUID, at date: Date = Date()) throws {
+        let stmt = try db.prepare("""
+            UPDATE chat_threads
+            SET archived_at = NULL, updated_at = ?
+            WHERE id = ?
+            """)
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_double(stmt, 1, date.timeIntervalSince1970)
+        bindText(stmt, index: 2, value: threadId.uuidString)
+        if sqlite3_step(stmt) != SQLITE_DONE {
+            throw StoreError.insertFailed
+        }
+    }
+
+    func insertChatMessage(_ message: ChatMessage) throws {
+        let enc = JSONEncoder()
+        let sourcesData = try enc.encode(message.sources)
+        let suggestionsData = try enc.encode(message.suggestions)
+        let sourcesJson = String(data: sourcesData, encoding: .utf8) ?? "[]"
+        let suggestionsJson = String(data: suggestionsData, encoding: .utf8) ?? "[]"
+
+        try db.inTransaction {
+            let stmt = try db.prepare("""
+                INSERT INTO chat_messages (id, thread_id, role, content, created_at, sources_json, suggestions_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """)
+            defer { sqlite3_finalize(stmt) }
+            bindText(stmt, index: 1, value: message.id.uuidString)
+            bindText(stmt, index: 2, value: message.threadId.uuidString)
+            bindText(stmt, index: 3, value: message.role.rawValue)
+            bindText(stmt, index: 4, value: message.content)
+            sqlite3_bind_double(stmt, 5, message.createdAt.timeIntervalSince1970)
+            bindText(stmt, index: 6, value: sourcesJson)
+            bindText(stmt, index: 7, value: suggestionsJson)
+            if sqlite3_step(stmt) != SQLITE_DONE {
+                throw StoreError.insertFailed
+            }
+
+            let preview = message.content.replacingOccurrences(of: "\n", with: " ")
+            let truncatedPreview = String(preview.prefix(140))
+            try updateChatThread(
+                threadId: message.threadId,
+                updatedAt: message.createdAt,
+                lastMessagePreview: truncatedPreview
+            )
+        }
+    }
+
+    func fetchChatMessages(threadId: UUID) throws -> [ChatMessage] {
+        let stmt = try db.prepare("""
+            SELECT id, thread_id, role, content, created_at, sources_json, suggestions_json
+            FROM chat_messages
+            WHERE thread_id = ?
+            ORDER BY created_at ASC
+            """)
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, index: 1, value: threadId.uuidString)
+        let dec = JSONDecoder()
+        var out: [ChatMessage] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let id = UUID(uuidString: String(cString: sqlite3_column_text(stmt, 0))) ?? UUID()
+            let tid = UUID(uuidString: String(cString: sqlite3_column_text(stmt, 1))) ?? threadId
+            let roleRaw = String(cString: sqlite3_column_text(stmt, 2))
+            let role = ChatRole(rawValue: roleRaw) ?? .assistant
+            let content = String(cString: sqlite3_column_text(stmt, 3))
+            let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 4))
+            var sources: [SourceRef] = []
+            var suggestions: [String] = []
+            if let sourcesPtr = sqlite3_column_text(stmt, 5),
+               let data = String(cString: sourcesPtr).data(using: .utf8),
+               let decoded = try? dec.decode([SourceRef].self, from: data) {
+                sources = decoded
+            }
+            if let suggestionsPtr = sqlite3_column_text(stmt, 6),
+               let data = String(cString: suggestionsPtr).data(using: .utf8),
+               let decoded = try? dec.decode([String].self, from: data) {
+                suggestions = decoded
+            }
+            out.append(
+                ChatMessage(
+                    id: id,
+                    threadId: tid,
+                    role: role,
+                    content: content,
+                    sources: sources,
+                    suggestions: suggestions,
+                    createdAt: createdAt
+                )
+            )
+        }
+        return out
+    }
+
+    func fetchChatAnalyticsSummary() throws -> ChatAnalyticsSummary {
+        let activeThreads = try scalarInt("SELECT COUNT(*) FROM chat_threads WHERE archived_at IS NULL")
+        let archivedThreads = try scalarInt("SELECT COUNT(*) FROM chat_threads WHERE archived_at IS NOT NULL")
+        let totalMessages = try scalarInt("""
+            SELECT COUNT(*)
+            FROM chat_messages m
+            JOIN chat_threads t ON t.id = m.thread_id
+            WHERE t.archived_at IS NULL
+            """)
+        let userMessages = try scalarInt("""
+            SELECT COUNT(*)
+            FROM chat_messages m
+            JOIN chat_threads t ON t.id = m.thread_id
+            WHERE t.archived_at IS NULL AND m.role = 'user'
+            """)
+        let assistantMessages = try scalarInt("""
+            SELECT COUNT(*)
+            FROM chat_messages m
+            JOIN chat_threads t ON t.id = m.thread_id
+            WHERE t.archived_at IS NULL AND m.role = 'assistant'
+            """)
+        let assistantWithSources = try scalarInt("""
+            SELECT COUNT(*)
+            FROM chat_messages m
+            JOIN chat_threads t ON t.id = m.thread_id
+            WHERE t.archived_at IS NULL
+              AND m.role = 'assistant'
+              AND COALESCE(m.sources_json, '[]') != '[]'
+            """)
+        let mostRecent = try scalarDouble("""
+            SELECT MAX(m.created_at)
+            FROM chat_messages m
+            JOIN chat_threads t ON t.id = m.thread_id
+            WHERE t.archived_at IS NULL
+            """)
+
+        let sourceHitRate: Double = assistantMessages > 0
+            ? Double(assistantWithSources) / Double(assistantMessages)
+            : 0
+        let avgMessages: Double = activeThreads > 0
+            ? Double(totalMessages) / Double(activeThreads)
+            : 0
+
+        return ChatAnalyticsSummary(
+            activeThreads: activeThreads,
+            archivedThreads: archivedThreads,
+            totalMessages: totalMessages,
+            userMessages: userMessages,
+            assistantMessages: assistantMessages,
+            assistantMessagesWithSources: assistantWithSources,
+            sourceHitRate: sourceHitRate,
+            avgMessagesPerActiveThread: avgMessages,
+            mostRecentMessageAt: mostRecent.map { Date(timeIntervalSince1970: $0) }
+        )
+    }
+
+    func fetchTopChatThreadStats(limit: Int = 10) throws -> [ChatThreadStat] {
+        let stmt = try db.prepare("""
+            SELECT
+              t.id,
+              t.title,
+              t.created_at,
+              t.updated_at,
+              t.last_message_preview,
+              COUNT(m.id) AS message_count,
+              SUM(CASE WHEN m.role = 'user' THEN 1 ELSE 0 END) AS user_count,
+              SUM(CASE WHEN m.role = 'assistant' THEN 1 ELSE 0 END) AS assistant_count
+            FROM chat_threads t
+            LEFT JOIN chat_messages m ON m.thread_id = t.id
+            WHERE t.archived_at IS NULL
+            GROUP BY t.id, t.title, t.created_at, t.updated_at, t.last_message_preview
+            ORDER BY t.updated_at DESC
+            LIMIT ?
+            """)
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_int(stmt, 1, Int32(max(1, limit)))
+        var out: [ChatThreadStat] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let id = UUID(uuidString: String(cString: sqlite3_column_text(stmt, 0))) ?? UUID()
+            let title = String(cString: sqlite3_column_text(stmt, 1))
+            let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 2))
+            let updatedAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 3))
+            let preview = sqlite3_column_text(stmt, 4).map { String(cString: $0) } ?? ""
+            let messageCount = Int(sqlite3_column_int(stmt, 5))
+            let userCount = Int(sqlite3_column_int(stmt, 6))
+            let assistantCount = Int(sqlite3_column_int(stmt, 7))
+            let thread = ChatThread(
+                id: id,
+                title: title,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                lastMessagePreview: preview,
+                archivedAt: nil
+            )
+            out.append(
+                ChatThreadStat(
+                    thread: thread,
+                    messageCount: messageCount,
+                    userMessageCount: userCount,
+                    assistantMessageCount: assistantCount
+                )
+            )
+        }
+        return out
+    }
+
     // MARK: - Helpers
+
+    private func scalarInt(_ sql: String) throws -> Int {
+        let stmt = try db.prepare(sql)
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
+        return Int(sqlite3_column_int64(stmt, 0))
+    }
+
+    private func scalarDouble(_ sql: String) throws -> Double? {
+        let stmt = try db.prepare(sql)
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
+        if sqlite3_column_type(stmt, 0) == SQLITE_NULL {
+            return nil
+        }
+        return sqlite3_column_double(stmt, 0)
+    }
 
     private func floatsToBlob(_ floats: [Float]) -> Data {
         floats.withUnsafeBufferPointer { buf in
