@@ -27,9 +27,6 @@ feedback-server/node_modules/
 *.p12
 *.mobileprovision
 
-# Local docs (keep local only, do not push)
-docs/
-
 # Local tooling artifacts (keep local only)
 AGENTS.md
 FINAL_PRODUCT.md
