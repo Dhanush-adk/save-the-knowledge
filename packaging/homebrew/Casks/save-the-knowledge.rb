@@ -1,8 +1,9 @@
 cask "save-the-knowledge" do
-  version "1.0.0"
-  sha256 "REPLACE_WITH_RELEASE_ASSET_SHA256"
+  version "1.0"
+  build "7"
+  sha256 "0282f1274850f04cd0511cbb4cbb41fe157e250b4745aa2c11c25c7a623e0b01"
 
-  url "https://github.com/Dhanush-adk/save-the-knowledge/releases/download/v#{version}/save-the-knowledge-macOS-v#{version}-bBUILD-unsigned.dmg",
+  url "https://github.com/Dhanush-adk/save-the-knowledge/releases/download/v#{version}/save-the-knowledge-macOS-v#{version}-b#{build}-unsigned.dmg",
       verified: "github.com/Dhanush-adk/save-the-knowledge/"
   name "Save the Knowledge"
   desc "Offline-first local knowledge base desktop app"
