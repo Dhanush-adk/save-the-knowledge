@@ -19,7 +19,9 @@ Production backend for **Save the Knowledge** desktop app telemetry, feedback, i
 ## Architecture
 
 - Runtime: Node.js serverless functions on Vercel
-- Storage: Vercel Blob (`kc/data.json`)
+- Storage:
+  - Production: MongoDB (`MONGODB_URI`)
+  - Fallback: Vercel Blob (`kc/data.json`)
 - Optional distributed controls: Upstash Redis REST (rate limiting + idempotency)
 - Security model:
   - write auth via API key(s) or install token
@@ -45,7 +47,9 @@ Production backend for **Save the Knowledge** desktop app telemetry, feedback, i
 
 ### Core
 
-- `BLOB_READ_WRITE_TOKEN` (required in production)
+- `MONGODB_URI` (recommended for production scale)
+- `MONGODB_DB` (optional; default: `save_the_knowledge`)
+- `BLOB_READ_WRITE_TOKEN` (fallback mode only)
 - `FEEDBACK_DATA_ENCRYPTION_KEY` (recommended; encrypts Blob payload)
 
 ### Write authentication (choose one strategy)
@@ -75,6 +79,8 @@ Production backend for **Save the Knowledge** desktop app telemetry, feedback, i
 - `APP_DOWNLOAD_URL`
 - `APP_RELEASE_NOTES`
 - `MAX_ANALYTICS`, `MAX_FEEDBACK`, `MAX_SAVED_URLS`, `MAX_ISSUES`, `MAX_IDEMPOTENCY_KEYS`
+- `MONGO_READ_LIMIT_ANALYTICS`, `MONGO_READ_LIMIT_FEEDBACK`, `MONGO_READ_LIMIT_SAVED_URLS`, `MONGO_READ_LIMIT_ISSUES`
+- `MONGO_KPI_ANALYTICS_LIMIT`
 
 ### Optional Redis REST (recommended for production scale)
 
@@ -85,6 +91,7 @@ Production backend for **Save the Knowledge** desktop app telemetry, feedback, i
 
 - `RATE_LIMIT_ANALYTICS_PER_MIN`
 - `RATE_LIMIT_FEEDBACK_PER_MIN`
+- `RATE_LIMIT_ISSUES_PER_MIN`
 - `RATE_LIMIT_STATS_PER_MIN`
 - `RATE_LIMIT_KPIS_PER_MIN`
 - `RATE_LIMIT_KPI_EXPORT_PER_MIN`
@@ -110,10 +117,10 @@ vercel --prod
 
 Production checklist:
 
-1. Attach Blob storage and set `BLOB_READ_WRITE_TOKEN`.
+1. Configure MongoDB (`MONGODB_URI`) and optional `MONGODB_DB`.
 2. Configure write auth (`FEEDBACK_API_KEY(S)` or install-token secrets).
 3. Configure read/dashboard auth.
-4. Set `FEEDBACK_DATA_ENCRYPTION_KEY`.
+4. If using Blob fallback, set `BLOB_READ_WRITE_TOKEN` and `FEEDBACK_DATA_ENCRYPTION_KEY`.
 5. Add Redis REST credentials for distributed rate-limit/idempotency.
 6. Set app version metadata for update prompts.
 

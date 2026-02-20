@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "@vercel/blob": "^2.2.0"
+    "@vercel/blob": "^2.2.0",
+    "mongodb": "^6.18.0"
   }
 }

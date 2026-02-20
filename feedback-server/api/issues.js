@@ -7,7 +7,7 @@ module.exports = async (req, res) => {
     return;
   }
   if (!requireWriteAuth(req, res)) return;
-  if (!(await checkRateLimit(req, res, 'feedback'))) return;
+  if (!(await checkRateLimit(req, res, 'issues'))) return;
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
     const idemKey = idempotencyKeyFrom(req, body, 'issues');

@@ -18,6 +18,7 @@ module.exports = async (req, res) => {
       os_version: body.os_version || null,
       install_id: body.install_id || null,
       session_id: body.session_id || null,
+      source: typeof body.source === 'string' ? body.source : null,
       saves_count: Number.isFinite(body.saves_count) ? body.saves_count : null,
       urls_saved_total: Number.isFinite(body.urls_saved_total) ? body.urls_saved_total : null,
       raw_bytes_total: Number.isFinite(body.raw_bytes_total) ? body.raw_bytes_total : null,
@@ -29,6 +30,14 @@ module.exports = async (req, res) => {
       activated: typeof body.activated === 'boolean' ? body.activated : null,
       saved_item_id: typeof body.saved_item_id === 'string' ? body.saved_item_id : null,
       saved_item_title: typeof body.saved_item_title === 'string' ? body.saved_item_title : null,
+      queue_reason: typeof body.queue_reason === 'string' ? body.queue_reason : null,
+      pending_queue_size: Number.isFinite(body.pending_queue_size) ? body.pending_queue_size : null,
+      oldest_pending_age_seconds: Number.isFinite(body.oldest_pending_age_seconds) ? body.oldest_pending_age_seconds : null,
+      flush_attempted_count: Number.isFinite(body.flush_attempted_count) ? body.flush_attempted_count : null,
+      flush_sent_count: Number.isFinite(body.flush_sent_count) ? body.flush_sent_count : null,
+      flush_failed_count: Number.isFinite(body.flush_failed_count) ? body.flush_failed_count : null,
+      flush_success_rate: Number.isFinite(body.flush_success_rate) ? body.flush_success_rate : null,
+      sync_error_rate: Number.isFinite(body.sync_error_rate) ? body.sync_error_rate : null,
       timestamp: body.timestamp || null,
     };
     console.log('[analytics]', JSON.stringify(payload));

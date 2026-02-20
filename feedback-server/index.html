@@ -21,6 +21,18 @@
     .refresh { margin-bottom: 16px; }
     .refresh button { padding: 8px 14px; background: #333; color: #e0e0e0; border: 1px solid #444; border-radius: 6px; cursor: pointer; }
     .refresh button:hover { background: #444; }
+    .refresh button:disabled,
+    .filters button:disabled,
+    .authbar button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .loading-status {
+      margin: 6px 0 10px;
+      color: #9ec1ff;
+      font-size: 0.86rem;
+      min-height: 20px;
+    }
     .authbar {
       display: grid;
       grid-template-columns: 1fr auto auto;
@@ -194,6 +206,7 @@
     <div class="refresh">
       <button type="button" id="refresh">Refresh</button>
     </div>
+    <div id="dashboard-status" class="loading-status"></div>
     <section>
       <h2>Dashboard Filters</h2>
       <div class="filters">
@@ -213,10 +226,6 @@
           <label for="filter-event">Event Type</label>
           <select id="filter-event">
             <option value="">All events</option>
-            <option value="session_started">session_started</option>
-            <option value="url_saved">url_saved</option>
-            <option value="query_answered">query_answered</option>
-            <option value="feedback_sent">feedback_sent</option>
           </select>
         </div>
         <div>
@@ -423,10 +432,12 @@
     }
 
     async function load() {
+      setDashboardLoading(true, 'Loading dashboard data...');
       try {
         const authed = await ensureSession();
         if (!authed) {
           document.getElementById('analytics-summary').innerHTML = '<span class="error">Login required. Enter admin password and click Login.</span>';
+          setDashboardLoading(false, 'Login required.');
           return;
         }
         const params = new URLSearchParams();
@@ -443,10 +454,12 @@
         ]);
         if (statsRes.status === 401) {
           document.getElementById('analytics-summary').innerHTML = '<span class="error">Unauthorized. Please login again.</span>';
+          setDashboardLoading(false, 'Unauthorized. Please login again.');
           return;
         }
         const data = await statsRes.json();
         window.__kc_counts = data.counts || null;
+        updateEventFilterOptions(data.event_types || []);
         const retentionData = retentionRes.ok ? await retentionRes.json() : { cohorts: [] };
         renderKpis(data.kpis || {});
         renderAnalytics(data.analytics || []);
@@ -454,18 +467,46 @@
         renderIssues(data.issues || []);
         renderSavedUrls(data.saved_urls || []);
         renderRetentionCohorts(retentionData.cohorts || []);
+        setDashboardLoading(false, 'Dashboard updated.');
       } catch (e) {
         document.getElementById('analytics-summary').innerHTML = '<span class="error">Failed to load. Ensure Blob store is connected and redeploy.</span>';
+        setDashboardLoading(false, 'Failed to load dashboard data.');
       }
+    }
+    function setDashboardLoading(isLoading, message = '') {
+      const status = document.getElementById('dashboard-status');
+      if (status) {
+        status.textContent = isLoading ? `Loading... ${message}` : message;
+      }
+      const ids = [
+        'refresh',
+        'apply-filters',
+        'clear-filters',
+        'dashboard-login',
+        'dashboard-logout',
+        'retention-json-btn',
+        'retention-csv-btn',
+      ];
+      ids.forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = !!isLoading;
+      });
     }
     function renderAnalytics(arr) {
       const tbody = document.getElementById('analytics-body');
       const empty = document.getElementById('analytics-empty');
       const summary = document.getElementById('analytics-summary');
-      const total = window.__kc_counts?.analytics_total;
-      summary.textContent = arr.length
-        ? (Number.isFinite(total) ? `Total: ${total} event(s) (showing ${arr.length})` : `Total: ${arr.length} event(s)`)
-        : '';
+      const totalFiltered = window.__kc_counts?.analytics_total;
+      const totalScope = window.__kc_counts?.analytics_scope_total;
+      if (!arr.length) {
+        summary.textContent = Number.isFinite(totalFiltered) ? `Total: ${totalFiltered} event(s)` : '';
+      } else if (Number.isFinite(totalFiltered) && Number.isFinite(totalScope) && totalFiltered !== totalScope) {
+        summary.textContent = `Matching events: ${totalFiltered} (scope total: ${totalScope}, showing ${arr.length})`;
+      } else if (Number.isFinite(totalFiltered)) {
+        summary.textContent = `Total: ${totalFiltered} event(s) (showing ${arr.length})`;
+      } else {
+        summary.textContent = `Total: ${arr.length} event(s)`;
+      }
       if (!arr.length) {
         tbody.innerHTML = '';
         empty.style.display = 'block';
@@ -494,6 +535,11 @@
       const grid = document.getElementById('kpi-grid');
       const trendBody = document.getElementById('kpi-trend-body');
       const empty = document.getElementById('kpi-empty');
+      const storageEfficiency = (() => {
+        if (summary.storage_saved_pct != null) return `${Number(summary.storage_saved_pct).toFixed(1)}%`;
+        if (summary.storage_overhead_pct != null) return `Overhead +${Number(summary.storage_overhead_pct).toFixed(1)}%`;
+        return '—';
+      })();
       const cards = [
         ['Unique Installs', fmtNum(summary.unique_installs)],
         ['Activated Installs', fmtNum(summary.activated_installs)],
@@ -502,7 +548,7 @@
         ['Query p95 (ms)', fmtNum(summary.query_latency_p95_ms)],
         ['Raw Bytes', fmtNum(summary.raw_bytes_total)],
         ['Stored Bytes', fmtNum(summary.stored_bytes_total)],
-        ['Storage Saved %', summary.storage_saved_pct == null ? '—' : `${Number(summary.storage_saved_pct).toFixed(1)}%`],
+        ['Storage Efficiency', storageEfficiency],
         ['D1 Retention', fmtPct(summary.d1_retention_rate)],
         ['D7 Retention', fmtPct(summary.d7_retention_rate)],
       ];
@@ -639,6 +685,21 @@
       `).join('');
     }
     function updateRetentionExportLinks() {}
+
+    function updateEventFilterOptions(events) {
+      const select = document.getElementById('filter-event');
+      const selected = filters.event || '';
+      const uniqueEvents = Array.from(new Set((Array.isArray(events) ? events : []).map((e) => String(e || '').trim()).filter(Boolean)));
+      const options = ['<option value="">All events</option>']
+        .concat(uniqueEvents.map((eventName) => `<option value="${escapeHtml(eventName)}">${escapeHtml(eventName)}</option>`));
+      select.innerHTML = options.join('');
+      if (selected && uniqueEvents.includes(selected)) {
+        select.value = selected;
+      } else {
+        select.value = '';
+        filters.event = '';
+      }
+    }
 
     async function downloadRetention(format) {
       const authed = await ensureSession();

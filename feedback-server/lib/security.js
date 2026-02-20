@@ -297,6 +297,7 @@ async function checkRateLimit(req, res, route, limit = DEFAULT_LIMIT) {
   const limitByRoute = {
     analytics: Number(process.env.RATE_LIMIT_ANALYTICS_PER_MIN || 60),
     feedback: Number(process.env.RATE_LIMIT_FEEDBACK_PER_MIN || 30),
+    issues: Number(process.env.RATE_LIMIT_ISSUES_PER_MIN || 30),
     stats: Number(process.env.RATE_LIMIT_STATS_PER_MIN || 60),
     kpis: Number(process.env.RATE_LIMIT_KPIS_PER_MIN || 40),
     kpi_export: Number(process.env.RATE_LIMIT_KPI_EXPORT_PER_MIN || 20),

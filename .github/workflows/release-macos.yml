@@ -1,0 +1,32 @@
+name: Release macOS (Unsigned)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-release:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install feedback-server dependencies
+        working-directory: feedback-server
+        run: npm ci
+
+      - name: Run quality checks
+        run: ./scripts/run_quality_checks.sh
+
+      - name: Package unsigned release artifacts
+        run: ./scripts/package_unsigned_macos.sh
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: knowledge-cache-macos-unsigned
+          path: build/release/*

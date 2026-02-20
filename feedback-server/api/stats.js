@@ -1,19 +1,6 @@
-const { readData } = require('../lib/store');
+const { readData, queryStatsData, parseDateInput } = require('../lib/store');
 const { computeKpis } = require('../lib/kpis');
 const { requireDashboardAccess, checkRateLimit } = require('../lib/security');
-
-function parseDateInput(raw, endOfDay = false) {
-  if (!raw || typeof raw !== 'string') return null;
-  const value = raw.trim();
-  if (!value) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const suffix = endOfDay ? 'T23:59:59.999Z' : 'T00:00:00.000Z';
-    const d = new Date(`${value}${suffix}`);
-    return Number.isNaN(d.getTime()) ? null : d;
-  }
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
 
 function parseTs(entry) {
   const d = new Date(entry?._at || entry?.timestamp || '');
@@ -51,41 +38,92 @@ module.exports = async (req, res) => {
     const limitSavedUrls = parseLimit(url.searchParams.get('limit_saved_urls'), 1000);
     const limitIssues = parseLimit(url.searchParams.get('limit_issues'), 200);
 
-    const data = await readData();
-    const analyticsAll = (data.analytics || []).filter((entry) => {
-      const ts = parseTs(entry);
-      if (!withinRange(ts, from, to)) return false;
-      if (installId && entry.install_id !== installId) return false;
-      if (event && entry.event !== event) return false;
-      return true;
+    const dbData = await queryStatsData({
+      from,
+      to,
+      installId,
+      event,
+      limitAnalytics,
+      limitFeedback,
+      limitSavedUrls,
+      limitIssues,
     });
-    const feedbackAll = (data.feedback || []).filter((entry) => withinRange(parseTs(entry), from, to));
-    const savedUrlsAll = (data.saved_urls || []).filter((entry) => withinRange(parseTs(entry), from, to));
-    const issuesAll = (data.issues || []).filter((entry) => withinRange(parseTs(entry), from, to));
 
-    data.counts = {
-      analytics_total: analyticsAll.length,
-      feedback_total: feedbackAll.length,
-      saved_urls_total: savedUrlsAll.length,
-      issues_total: issuesAll.length,
-    };
+    let response;
+    if (dbData) {
+      response = {
+        analytics: dbData.analytics,
+        feedback: dbData.feedback,
+        saved_urls: dbData.saved_urls,
+        issues: dbData.issues,
+        event_types: dbData.event_types,
+        counts: dbData.counts,
+        kpis: computeKpis(dbData.kpi_analytics),
+        filters: {
+          from: from ? from.toISOString() : null,
+          to: to ? to.toISOString() : null,
+          install_id: installId || null,
+          event: event || null,
+        },
+      };
+    } else {
+      const data = await readData();
+      const analyticsScoped = (data.analytics || []).filter((entry) => {
+        const ts = parseTs(entry);
+        if (!withinRange(ts, from, to)) return false;
+        if (installId && entry.install_id !== installId) return false;
+        return true;
+      });
+      const analyticsFiltered = analyticsScoped.filter((entry) => {
+        if (event && entry.event !== event) return false;
+        return true;
+      });
+      const feedbackAll = (data.feedback || []).filter((entry) => {
+        const ts = parseTs(entry);
+        if (!withinRange(ts, from, to)) return false;
+        if (installId && entry.install_id !== installId) return false;
+        return true;
+      });
+      const savedUrlsAll = (data.saved_urls || []).filter((entry) => {
+        const ts = parseTs(entry);
+        if (!withinRange(ts, from, to)) return false;
+        if (installId && entry.install_id !== installId) return false;
+        return true;
+      });
+      const issuesAll = (data.issues || []).filter((entry) => {
+        const ts = parseTs(entry);
+        if (!withinRange(ts, from, to)) return false;
+        if (installId && entry.install_id !== installId) return false;
+        return true;
+      });
 
-    // KPI computation should use the full filtered dataset, even if we only preview N rows in the UI.
-    data.kpis = computeKpis(analyticsAll);
-    data.analytics = analyticsAll.slice(0, limitAnalytics);
-    data.feedback = feedbackAll.slice(0, limitFeedback);
-    data.saved_urls = savedUrlsAll.slice(0, limitSavedUrls);
-    data.issues = issuesAll.slice(0, limitIssues);
-    data.filters = {
-      from: from ? from.toISOString() : null,
-      to: to ? to.toISOString() : null,
-      install_id: installId || null,
-      event: event || null,
-    };
+      response = {
+        analytics: analyticsFiltered.slice(0, limitAnalytics),
+        feedback: feedbackAll.slice(0, limitFeedback),
+        saved_urls: savedUrlsAll.slice(0, limitSavedUrls),
+        issues: issuesAll.slice(0, limitIssues),
+        event_types: [...new Set(analyticsScoped.map((entry) => (entry?.event || '').toString().trim()).filter(Boolean))]
+          .sort((a, b) => a.localeCompare(b)),
+        counts: {
+          analytics_total: analyticsFiltered.length,
+          analytics_scope_total: analyticsScoped.length,
+          feedback_total: feedbackAll.length,
+          saved_urls_total: savedUrlsAll.length,
+          issues_total: issuesAll.length,
+        },
+        kpis: computeKpis(analyticsScoped),
+        filters: {
+          from: from ? from.toISOString() : null,
+          to: to ? to.toISOString() : null,
+          install_id: installId || null,
+          event: event || null,
+        },
+      };
+    }
 
     // Authenticated dashboard data should never be cached by shared proxies/edges.
     res.setHeader('Cache-Control', 'private, no-store');
-    res.status(200).json(data);
+    res.status(200).json(response);
   } catch (e) {
     console.error('[stats]', e);
     res.status(200).json({
@@ -93,6 +131,7 @@ module.exports = async (req, res) => {
       feedback: [],
       saved_urls: [],
       issues: [],
+      event_types: [],
       kpis: {
         summary: {},
         funnel: {},

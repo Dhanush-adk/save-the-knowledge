@@ -11,6 +11,7 @@ import Security
 final class FeedbackReporter {
     private let pendingStore: PendingFeedbackStore
     private let pendingIssueStore: PendingIssueStore
+    private let pendingAnalyticsStore: PendingAnalyticsStore
     private let baseURL: String
     private let analyticsEnabledKey = "KnowledgeCache.analyticsEnabled"
     private let lastAnalyticsSentKey = "KnowledgeCache.lastAnalyticsSent"
@@ -44,14 +45,24 @@ final class FeedbackReporter {
         }
     }
 
-    init(pendingStore: PendingFeedbackStore, issueStore: PendingIssueStore = PendingIssueStore()) {
+    init(
+        pendingStore: PendingFeedbackStore,
+        issueStore: PendingIssueStore = PendingIssueStore(),
+        analyticsStore: PendingAnalyticsStore = PendingAnalyticsStore()
+    ) {
         self.pendingStore = pendingStore
         self.pendingIssueStore = issueStore
+        self.pendingAnalyticsStore = analyticsStore
         self.baseURL = FeedbackConfig.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     var isAnalyticsEnabled: Bool {
-        get { UserDefaults.standard.bool(forKey: analyticsEnabledKey) }
+        get {
+            if UserDefaults.standard.object(forKey: analyticsEnabledKey) == nil {
+                return true
+            }
+            return UserDefaults.standard.bool(forKey: analyticsEnabledKey)
+        }
         set { UserDefaults.standard.set(newValue, forKey: analyticsEnabledKey) }
     }
 
@@ -131,29 +142,83 @@ final class FeedbackReporter {
 
     /// Send minimal analytics (opt-in, throttled to once per interval).
     func sendAnalyticsIfNeeded(savesCount: Int, isConnected: Bool) {
-        guard isAnalyticsEnabled, isConnected, !baseURL.isEmpty else { return }
+        guard isAnalyticsEnabled, !baseURL.isEmpty else { return }
         let last = UserDefaults.standard.double(forKey: lastAnalyticsSentKey)
         let now = Date().timeIntervalSince1970
         guard now - last >= analyticsInterval else { return }
+        var body: [String: Any] = ["saves_count": savesCount]
+        body.merge(defaultAnalyticsFields(event: "session")) { _, new in new }
         Task.detached(priority: .utility) { [weak self] in
             guard let self = self else { return }
-            var body: [String: Any] = ["saves_count": savesCount]
-            body.merge(self.defaultAnalyticsFields(event: "session")) { _, new in new }
+            if !isConnected {
+                self.enqueueAnalyticsBody(body, error: "queued_offline")
+                return
+            }
             let ok = await self.postJSON(path: FeedbackConfig.analyticsPath, body: body, timeout: 15)
             if ok {
                 UserDefaults.standard.set(now, forKey: self.lastAnalyticsSentKey)
+            } else {
+                self.enqueueAnalyticsBody(body, error: "send_failed")
             }
         }
     }
 
     /// Send event-level analytics for KPI reporting.
     func sendAnalyticsEvent(event: String, metrics: [String: Any], isConnected: Bool) {
-        guard isAnalyticsEnabled, isConnected, !baseURL.isEmpty else { return }
+        guard isAnalyticsEnabled, !baseURL.isEmpty else { return }
         Task.detached(priority: .utility) { [weak self] in
             guard let self = self else { return }
             var body = self.defaultAnalyticsFields(event: event)
             body.merge(metrics) { _, new in new }
-            _ = await self.postJSON(path: FeedbackConfig.analyticsPath, body: body, timeout: 15)
+            if !isConnected {
+                self.enqueueAnalyticsBody(body, error: "queued_offline")
+                return
+            }
+            let ok = await self.postJSON(path: FeedbackConfig.analyticsPath, body: body, timeout: 15)
+            if !ok {
+                self.enqueueAnalyticsBody(body, error: "send_failed")
+            }
+        }
+    }
+
+    func flushPendingAnalytics(isConnected: Bool, completion: ((Int, String?) -> Void)? = nil) {
+        guard isConnected, !baseURL.isEmpty, isAnalyticsEnabled else {
+            completion?(0, "Not connected or analytics disabled.")
+            return
+        }
+        let items = pendingAnalyticsStore.synchronouslyLoad()
+        guard !items.isEmpty else {
+            completion?(0, nil)
+            return
+        }
+
+        Task.detached(priority: .utility) { [weak self] in
+            guard let self = self else { return }
+            var sentIds: Set<String> = []
+            var lastError: String?
+
+            for item in items {
+                guard let body = Self.jsonObject(from: item.bodyJSON) else {
+                    self.pendingAnalyticsStore.synchronouslyMarkFailure(id: item.id, error: "invalid_payload")
+                    lastError = "invalid_payload"
+                    continue
+                }
+                let ok = await self.postJSON(path: FeedbackConfig.analyticsPath, body: body, timeout: 15)
+                if ok {
+                    sentIds.insert(item.id)
+                } else {
+                    self.pendingAnalyticsStore.synchronouslyMarkFailure(id: item.id, error: "send_failed")
+                    lastError = "send_failed"
+                }
+            }
+
+            if !sentIds.isEmpty {
+                self.pendingAnalyticsStore.synchronouslyRemove(ids: sentIds)
+            }
+
+            Task { @MainActor in
+                completion?(sentIds.count, sentIds.count == items.count ? nil : lastError)
+            }
         }
     }
 
@@ -295,6 +360,8 @@ final class FeedbackReporter {
             "type": item.type,
             "app_version": item.appVersion,
             "os_version": item.osVersion,
+            "install_id": installId,
+            "session_id": sessionId,
             "timestamp": item.timestamp
         ]
         guard let data = try? JSONSerialization.data(withJSONObject: body) else { return (false, "Invalid payload") }
@@ -379,6 +446,7 @@ final class FeedbackReporter {
 
     private func defaultAnalyticsFields(event: String) -> [String: Any] {
         [
+            "id": UUID().uuidString,
             "event": event,
             "app_version": Self.appVersion,
             "os_version": Self.osVersion,
@@ -386,6 +454,40 @@ final class FeedbackReporter {
             "session_id": sessionId,
             "timestamp": Self.iso8601()
         ]
+    }
+
+    private func enqueueAnalyticsBody(_ body: [String: Any], error: String?) {
+        guard let bodyJSON = Self.jsonString(from: body) else { return }
+        var item = PendingAnalyticsItem(
+            id: UUID().uuidString,
+            bodyJSON: bodyJSON,
+            timestamp: Self.iso8601(),
+            attemptCount: 0,
+            lastError: nil
+        )
+        if let error {
+            item.lastError = error
+            item.attemptCount = 1
+        }
+        pendingAnalyticsStore.append(item)
+    }
+
+    private static func jsonString(from object: [String: Any]) -> String? {
+        guard JSONSerialization.isValidJSONObject(object),
+              let data = try? JSONSerialization.data(withJSONObject: object),
+              let string = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        return string
+    }
+
+    private static func jsonObject(from raw: String) -> [String: Any]? {
+        guard let data = raw.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data),
+              let dict = obj as? [String: Any] else {
+            return nil
+        }
+        return dict
     }
 
     private static func addProtectionBypassHeader(to request: inout URLRequest) {

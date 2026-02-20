@@ -1,19 +1,6 @@
-const { readData } = require('../lib/store');
+const { readData, queryAnalyticsForRetention, parseDateInput } = require('../lib/store');
 const { generateRetentionCohorts, retentionCohortsToCsv } = require('../lib/kpis');
 const { requireDashboardAccess, checkRateLimit } = require('../lib/security');
-
-function parseDateInput(raw, endOfDay = false) {
-  if (!raw || typeof raw !== 'string') return null;
-  const value = raw.trim();
-  if (!value) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const suffix = endOfDay ? 'T23:59:59.999Z' : 'T00:00:00.000Z';
-    const d = new Date(`${value}${suffix}`);
-    return Number.isNaN(d.getTime()) ? null : d;
-  }
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
 
 function parseTs(entry) {
   const d = new Date(entry?._at || entry?.timestamp || '');
@@ -43,14 +30,17 @@ module.exports = async (req, res) => {
     const installId = (url.searchParams.get('install_id') || '').trim();
     const event = (url.searchParams.get('event') || '').trim();
 
-    const data = await readData();
-    const analytics = (data.analytics || []).filter((entry) => {
-      const ts = parseTs(entry);
-      if (!withinRange(ts, from, to)) return false;
-      if (installId && entry.install_id !== installId) return false;
-      if (event && entry.event !== event) return false;
-      return true;
-    });
+    let analytics = await queryAnalyticsForRetention({ from, to, installId, event });
+    if (!analytics) {
+      const data = await readData();
+      analytics = (data.analytics || []).filter((entry) => {
+        const ts = parseTs(entry);
+        if (!withinRange(ts, from, to)) return false;
+        if (installId && entry.install_id !== installId) return false;
+        if (event && entry.event !== event) return false;
+        return true;
+      });
+    }
     const exportData = generateRetentionCohorts(analytics);
 
     // Authenticated dashboard data should never be cached by shared proxies/edges.

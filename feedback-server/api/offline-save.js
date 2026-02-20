@@ -1,4 +1,4 @@
-const { appendSavedUrl } = require('../lib/store');
+const { appendSavedUrl, appendAnalytics } = require('../lib/store');
 const { requireWriteAuth, checkRateLimit, enforceIdempotency, idempotencyKeyFrom } = require('../lib/security');
 
 function parseBody(req) {
@@ -57,6 +57,27 @@ module.exports = async (req, res) => {
       url,
       title: title || null,
       source,
+    });
+
+    // Keep dashboard KPI parity for browser-shell saves.
+    await appendAnalytics({
+      event: 'url_saved',
+      app_version: typeof body.app_version === 'string' ? body.app_version : 'web-shell',
+      os_version: typeof body.os_version === 'string' ? body.os_version : null,
+      install_id: typeof body.install_id === 'string' ? body.install_id : null,
+      session_id: typeof body.session_id === 'string' ? body.session_id : null,
+      saves_count: null,
+      urls_saved_total: null,
+      raw_bytes_total: null,
+      stored_bytes_total: null,
+      query_success: null,
+      query_latency_ms: null,
+      query_latency_p95_ms: null,
+      question_length: null,
+      activated: true,
+      saved_item_id: saved.id,
+      saved_item_title: saved.title,
+      timestamp: typeof body.timestamp === 'string' ? body.timestamp : null,
     });
 
     console.log('[offline-save]', JSON.stringify(saved));

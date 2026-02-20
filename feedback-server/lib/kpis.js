@@ -23,6 +23,30 @@ function lastNumeric(events, field) {
   return null;
 }
 
+function computeStorageMetrics(rawBytes, storedBytes) {
+  const validRaw = Number.isFinite(rawBytes) && rawBytes > 0;
+  const validStored = Number.isFinite(storedBytes) && storedBytes >= 0;
+  if (!validRaw || !validStored) {
+    return {
+      storage_saved_pct: null,
+      storage_overhead_pct: null,
+      storage_metric_status: 'insufficient_data',
+    };
+  }
+  if (storedBytes <= rawBytes) {
+    return {
+      storage_saved_pct: ((rawBytes - storedBytes) / rawBytes) * 100,
+      storage_overhead_pct: 0,
+      storage_metric_status: 'ok',
+    };
+  }
+  return {
+    storage_saved_pct: null,
+    storage_overhead_pct: ((storedBytes - rawBytes) / rawBytes) * 100,
+    storage_metric_status: 'stored_exceeds_raw',
+  };
+}
+
 function computeRetention(installEvents, dayOffset) {
   let cohort = 0;
   let retained = 0;
@@ -217,10 +241,7 @@ function computeKpis(analytics) {
 
   const rawBytes = lastNumeric(events, 'raw_bytes_total');
   const storedBytes = lastNumeric(events, 'stored_bytes_total');
-  const storageSavedPct =
-    Number.isFinite(rawBytes) && Number.isFinite(storedBytes) && rawBytes > 0
-      ? ((rawBytes - storedBytes) / rawBytes) * 100
-      : null;
+  const storageMetrics = computeStorageMetrics(rawBytes, storedBytes);
 
   const d1 = computeRetention(installEvents, 1);
   const d7 = computeRetention(installEvents, 7);
@@ -239,7 +260,9 @@ function computeKpis(analytics) {
       query_latency_p95_ms: percentile(queryLatencies, 0.95),
       raw_bytes_total: rawBytes,
       stored_bytes_total: storedBytes,
-      storage_saved_pct: storageSavedPct,
+      storage_saved_pct: storageMetrics.storage_saved_pct,
+      storage_overhead_pct: storageMetrics.storage_overhead_pct,
+      storage_metric_status: storageMetrics.storage_metric_status,
       d1_retention_rate: d1.rate,
       d7_retention_rate: d7.rate,
     },
@@ -298,6 +321,8 @@ function generatePeriodicSnapshots(analytics, period = 'weekly') {
       raw_bytes_total: k.summary.raw_bytes_total,
       stored_bytes_total: k.summary.stored_bytes_total,
       storage_saved_pct: k.summary.storage_saved_pct,
+      storage_overhead_pct: k.summary.storage_overhead_pct,
+      storage_metric_status: k.summary.storage_metric_status,
       d1_retention_rate: k.summary.d1_retention_rate,
       d7_retention_rate: k.summary.d7_retention_rate,
     };
@@ -325,6 +350,8 @@ function periodicSnapshotsToCsv(exportData) {
     'raw_bytes_total',
     'stored_bytes_total',
     'storage_saved_pct',
+    'storage_overhead_pct',
+    'storage_metric_status',
     'd1_retention_rate',
     'd7_retention_rate',
   ];

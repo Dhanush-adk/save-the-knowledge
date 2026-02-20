@@ -12,8 +12,8 @@ module.exports = async (req, res) => {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
     const idemKey = idempotencyKeyFrom(req, body, 'feedback');
     if (!(await enforceIdempotency(res, idemKey))) return;
-    const { id, message, email, type, app_version, os_version, timestamp } = body;
-    const payload = { id, message, email, type, app_version, os_version, timestamp };
+    const { id, message, email, type, app_version, os_version, timestamp, install_id, session_id } = body;
+    const payload = { id, message, email, type, app_version, os_version, timestamp, install_id, session_id };
     console.log('[feedback]', JSON.stringify(payload));
     await appendFeedback(payload);
     const webhookUrl = process.env.FEEDBACK_WEBHOOK_URL;

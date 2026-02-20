@@ -663,6 +663,7 @@ final class AppState: ObservableObject {
                 self?.feedbackReporter.emitQueueHealthEvent(reason: "network_became_online", isConnected: connected)
                 self?.feedbackReporter.flushPendingFeedback(isConnected: connected)
                 self?.feedbackReporter.flushPendingIssues(isConnected: connected)
+                self?.feedbackReporter.flushPendingAnalytics(isConnected: connected)
                 await self?.refreshAppUpdateInfo()
                 await self?.refreshOllamaAvailability()
             }
@@ -674,6 +675,7 @@ final class AppState: ObservableObject {
             feedbackReporter.emitQueueHealthEvent(reason: "app_launch", isConnected: connected)
             feedbackReporter.flushPendingFeedback(isConnected: connected)
             feedbackReporter.flushPendingIssues(isConnected: connected)
+            feedbackReporter.flushPendingAnalytics(isConnected: connected)
             feedbackReporter.sendAnalyticsIfNeeded(savesCount: (try? store.fetchAllItems())?.count ?? 0, isConnected: connected)
             trackSessionStarted()
             await refreshAppUpdateInfo()

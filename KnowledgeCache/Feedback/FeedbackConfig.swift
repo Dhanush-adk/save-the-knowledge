@@ -14,8 +14,8 @@ enum FeedbackConfig {
     /// → set to "Only Preview Deployments" so production is public. See feedback-server/FIX-401.md.
     /// Set to empty string to disable sending (feedback will still be queued offline).
     static var baseURL: String {
-        // Stable Vercel production alias for the project.
-        "https://feedback-server-psi.vercel.app"
+        // Set this to your current production deployment/custom domain.
+        "https://feedback-server-d0wev5d0z-dhanushs-projects-acfd41f9.vercel.app"
     }
 
     /// Optional: Vercel "Protection Bypass for Automation" secret. If set, sent as
