@@ -36,7 +36,7 @@ Set publish directory to `website`, or drag/drop the folder into Netlify Drop.
 
 Replace placeholder links in `index.html`:
 
-- `https://github.com/YOUR_GITHUB_USER/knowledge-cache`
+- `https://github.com/Dhanush-adk/save-the-knowledge`
 
 Optional:
 
