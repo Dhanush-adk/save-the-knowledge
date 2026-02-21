@@ -112,7 +112,8 @@ private struct SidebarUpdateSection: View {
                 }
                 Text(updater.statusMessage)
                     .font(.caption)
-                    .lineLimit(2)
+                    .lineLimit(6)
+                    .fixedSize(horizontal: false, vertical: true)
                     .foregroundStyle(.secondary)
             }
 

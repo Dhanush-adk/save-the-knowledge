@@ -16,6 +16,7 @@ final class AppUpdateManager: ObservableObject {
     private let repo = "save-the-knowledge"
     private let tap = "Dhanush-adk/save-the-knowledge"
     private let cask = "save-the-knowledge"
+    private let appDisplayName = "Save the Knowledge"
 
     func checkForUpdates() async {
         guard !isChecking else { return }
@@ -72,10 +73,20 @@ final class AppUpdateManager: ObservableObject {
 
         guard let brewPath = resolveHomebrewPath() else {
             statusMessage = "Homebrew not found. Downloading installer DMG..."
-            let opened = await downloadAndOpenDMG(for: release)
-            if opened {
-                statusMessage = "Installer opened. Drag the new app to Applications, then restart."
-            } else {
+            let outcome = await downloadAndInstallFromDMG(for: release)
+            switch outcome {
+            case .installed:
+                restartRequiredAfterUpgrade = true
+                isUpdateAvailable = false
+                statusMessage = "Upgrade installed automatically. Restart app to finish update."
+            case .opened(let dmgPath):
+                statusMessage = """
+                Installer ready.
+                1) Quit the app.
+                2) Open \(dmgPath.lastPathComponent) and drag \(appDisplayName).app to Applications.
+                3) Replace existing app, then reopen.
+                """
+            case .failed:
                 statusMessage = "Could not open installer DMG. Download from GitHub Releases."
             }
             return
@@ -149,7 +160,14 @@ final class AppUpdateManager: ObservableObject {
     }
 
     private func downloadAndOpenDMG(for release: ReleaseInfo) async -> Bool {
-        guard let downloadURL = release.dmgDownloadURL else { return false }
+        let outcome = await downloadAndInstallFromDMG(for: release)
+        if case .opened = outcome { return true }
+        if case .installed = outcome { return true }
+        return false
+    }
+
+    private func downloadAndInstallFromDMG(for release: ReleaseInfo) async -> DMGUpgradeOutcome {
+        guard let downloadURL = release.dmgDownloadURL else { return .failed }
         var request = URLRequest(url: downloadURL)
         request.httpMethod = "GET"
         request.timeoutInterval = 180
@@ -157,7 +175,7 @@ final class AppUpdateManager: ObservableObject {
         do {
             let (tmpURL, response) = try await URLSession.shared.download(for: request)
             let code = (response as? HTTPURLResponse)?.statusCode ?? -1
-            guard code == 200 else { return false }
+            guard code == 200 else { return .failed }
 
             let fm = FileManager.default
             let downloads = fm.urls(for: .downloadsDirectory, in: .userDomainMask).first ?? fm.temporaryDirectory
@@ -168,11 +186,48 @@ final class AppUpdateManager: ObservableObject {
                 try? fm.removeItem(at: destination)
             }
             try fm.moveItem(at: tmpURL, to: destination)
-            return NSWorkspace.shared.open(destination)
+
+            if await tryInstallDMG(at: destination) {
+                return .installed
+            }
+
+            guard NSWorkspace.shared.open(destination) else { return .failed }
+            return .opened(destination)
         } catch {
             AppLogger.warning("Updater: dmg download/open failed - \(error.localizedDescription)")
-            return false
+            return .failed
         }
+    }
+
+    private func tryInstallDMG(at dmgURL: URL) async -> Bool {
+        let dmgPath = shellEscape(dmgURL.path)
+        let targetPath = shellEscape("/Applications/\(appDisplayName).app")
+        let appName = shellEscape("\(appDisplayName).app")
+        let command = """
+        set -e
+        MOUNT_POINT="$(hdiutil attach -nobrowse \(dmgPath) 2>/dev/null | awk '/\\/Volumes\\// {line=$0} END {sub(/^.*\\t/, \"\", line); print line}')"
+        if [ -z "$MOUNT_POINT" ] || [ ! -d "$MOUNT_POINT" ]; then
+          exit 1
+        fi
+        APP_SRC="$(find "$MOUNT_POINT" -maxdepth 2 -name \(appName) -print -quit)"
+        if [ -z "$APP_SRC" ]; then
+          hdiutil detach "$MOUNT_POINT" >/dev/null 2>&1 || true
+          exit 1
+        fi
+        osascript -e 'on run argv' \
+                  -e 'set srcPath to item 1 of argv' \
+                  -e 'set dstPath to item 2 of argv' \
+                  -e 'do shell script "ditto " & quoted form of srcPath & space & quoted form of dstPath with administrator privileges' \
+                  -e 'end run' \
+                  "$APP_SRC" \(targetPath)
+        hdiutil detach "$MOUNT_POINT" >/dev/null 2>&1 || true
+        """
+        let result = await runShell(command)
+        return result.success
+    }
+
+    private func shellEscape(_ value: String) -> String {
+        "'" + value.replacingOccurrences(of: "'", with: "'\"'\"'") + "'"
     }
 
     private func fetchLatestRelease() async throws -> ReleaseInfo {
@@ -242,6 +297,12 @@ final class AppUpdateManager: ObservableObject {
             }
         }
     }
+}
+
+private enum DMGUpgradeOutcome {
+    case installed
+    case opened(URL)
+    case failed
 }
 
 private struct ReleaseInfo {
