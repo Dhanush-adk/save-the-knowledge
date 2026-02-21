@@ -52,3 +52,4 @@ jobs:
 
       - name: Run quality checks
         run: ./scripts/run_quality_checks.sh
+

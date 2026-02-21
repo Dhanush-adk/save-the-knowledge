@@ -115,6 +115,8 @@ brew install --cask save-the-knowledge</code></pre>
         <div class="guide-card">
           <h3>1) Open the app on macOS</h3>
           <p>Open <code>Save the Knowledge.app</code> from Applications. If Gatekeeper blocks it, go to System Settings → Privacy & Security and click Allow/Open Anyway.</p>
+          <pre><code>open "/Applications/Save the Knowledge.app"</code></pre>
+          <button class="copy-btn" type="button" data-copy="open \"/Applications/Save the Knowledge.app\"" data-track="copy_run_app_click">Copy Run Command</button>
         </div>
         <div class="guide-card">
           <h3>2) Save your first knowledge items</h3>
@@ -124,8 +126,8 @@ brew install --cask save-the-knowledge</code></pre>
           <h3>3) Optional: Install Ollama</h3>
           <p>For richer local responses, install Ollama in Terminal:</p>
           <pre><code>brew install ollama
-ollama pull llama3.2</code></pre>
-          <button class="copy-btn" type="button" data-copy="brew install ollama\nollama pull llama3.2" data-track="copy_ollama_setup_click">Copy Ollama Setup</button>
+ollama pull llama3.2:1b</code></pre>
+          <button class="copy-btn" type="button" data-copy="brew install ollama\nollama pull llama3.2:1b" data-track="copy_ollama_setup_click">Copy Ollama Setup</button>
         </div>
         <div class="guide-card">
           <h3>4) Connect Ollama in app</h3>

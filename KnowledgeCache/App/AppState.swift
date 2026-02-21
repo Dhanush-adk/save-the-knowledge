@@ -676,6 +676,7 @@ final class AppState: ObservableObject {
             feedbackReporter.flushPendingFeedback(isConnected: connected)
             feedbackReporter.flushPendingIssues(isConnected: connected)
             feedbackReporter.flushPendingAnalytics(isConnected: connected)
+            feedbackReporter.sendInstallEventIfNeeded(isConnected: connected)
             feedbackReporter.sendAnalyticsIfNeeded(savesCount: (try? store.fetchAllItems())?.count ?? 0, isConnected: connected)
             trackSessionStarted()
             await refreshAppUpdateInfo()

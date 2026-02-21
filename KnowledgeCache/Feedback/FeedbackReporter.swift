@@ -15,6 +15,7 @@ final class FeedbackReporter {
     private let baseURL: String
     private let analyticsEnabledKey = "KnowledgeCache.analyticsEnabled"
     private let lastAnalyticsSentKey = "KnowledgeCache.lastAnalyticsSent"
+    private let installEventSentKey = "KnowledgeCache.installEventSent"
     private let installIdKey = "KnowledgeCache.installId"
     private let analyticsInterval: TimeInterval = 86400
     private let sessionId = UUID().uuidString
@@ -179,6 +180,23 @@ final class FeedbackReporter {
                 self.enqueueAnalyticsBody(body, error: "send_failed")
             }
         }
+    }
+
+    /// Emit a one-time install event so dashboards can detect first-time installs.
+    func sendInstallEventIfNeeded(isConnected: Bool) {
+        guard isAnalyticsEnabled, !baseURL.isEmpty else { return }
+        if UserDefaults.standard.bool(forKey: installEventSentKey) {
+            return
+        }
+        sendAnalyticsEvent(
+            event: "app_installed",
+            metrics: [
+                "source": "desktop_app",
+                "activated": true,
+            ],
+            isConnected: isConnected
+        )
+        UserDefaults.standard.set(true, forKey: installEventSentKey)
     }
 
     func flushPendingAnalytics(isConnected: Bool, completion: ((Int, String?) -> Void)? = nil) {

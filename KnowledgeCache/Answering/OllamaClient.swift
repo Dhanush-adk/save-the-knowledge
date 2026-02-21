@@ -3,7 +3,7 @@
 //  KnowledgeCache
 //
 //  Calls local Ollama (http://localhost:11434) for text generation. No model is shipped;
-//  user installs Ollama and runs e.g. "ollama pull llama3.2:latest" once.
+//  user installs Ollama and runs e.g. "ollama pull llama3.2:1b" once.
 //
 
 import Foundation
@@ -11,8 +11,8 @@ import AppKit
 
 enum OllamaClient {
     static let defaultBaseURL = URL(string: "http://localhost:11434")!
-    /// Model to use for answer generation (e.g. llama3.2:latest; user must have pulled it).
-    static let defaultModel = "llama3.2:latest"
+    /// Model to use for answer generation (smaller default for faster first-time pull).
+    static let defaultModel = "llama3.2:1b"
     static let defaultTimeout: TimeInterval = 60
     static let statusCheckTimeout: TimeInterval = 8
 
@@ -178,6 +178,8 @@ final class OllamaServiceManager: ObservableObject {
     @Published var isBusy: Bool = false
 
     private var managedServeProcess: Process?
+    private var activeShellProcess: Process?
+    private var cancellationRequested = false
     private var terminateObserver: NSObjectProtocol?
 
     init() {
@@ -204,14 +206,22 @@ final class OllamaServiceManager: ObservableObject {
 
     func installAndStart(model: String = OllamaClient.defaultModel) async {
         guard !isBusy else { return }
+        cancellationRequested = false
         isBusy = true
-        defer { isBusy = false }
+        defer {
+            isBusy = false
+            activeShellProcess = nil
+        }
 
         statusMessage = "Checking Ollama installation..."
         if !hasOllamaCommand() {
             statusMessage = "Installing Ollama with Homebrew..."
             let install = await runShell("if command -v brew >/dev/null 2>&1; then brew install ollama; elif [ -x /opt/homebrew/bin/brew ]; then /opt/homebrew/bin/brew install ollama; elif [ -x /usr/local/bin/brew ]; then /usr/local/bin/brew install ollama; else echo '__BREW_NOT_FOUND__'; exit 127; fi")
             if !install.success {
+                if cancellationRequested {
+                    statusMessage = "Ollama setup cancelled."
+                    return
+                }
                 let output = install.output.lowercased()
                 if output.contains("__brew_not_found__") || output.contains("command not found") {
                     statusMessage = "Homebrew is not available from the app environment. Run in Terminal: brew install ollama"
@@ -223,11 +233,23 @@ final class OllamaServiceManager: ObservableObject {
                 return
             }
         }
+        if cancellationRequested {
+            statusMessage = "Ollama setup cancelled."
+            return
+        }
 
         statusMessage = "Pulling model \(model)..."
         let pull = await runShell("ollama pull \(model)")
         if !pull.success {
+            if cancellationRequested {
+                statusMessage = "Ollama setup cancelled."
+                return
+            }
             statusMessage = "Model pull failed. Try manually: ollama pull \(model)"
+            return
+        }
+        if cancellationRequested {
+            statusMessage = "Ollama setup cancelled."
             return
         }
 
@@ -246,6 +268,14 @@ final class OllamaServiceManager: ObservableObject {
         guard let process = managedServeProcess, process.isRunning else { return }
         process.terminate()
         managedServeProcess = nil
+    }
+
+    func cancelInstallAndStart() {
+        cancellationRequested = true
+        if let process = activeShellProcess, process.isRunning {
+            process.terminate()
+        }
+        statusMessage = "Stopping current Ollama operation..."
     }
 
     private func hasOllamaCommand() -> Bool {
@@ -298,11 +328,17 @@ final class OllamaServiceManager: ObservableObject {
             process.terminationHandler = { proc in
                 let out = String(data: outPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
                 let err = String(data: errPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                Task { @MainActor [weak self] in
+                    if self?.activeShellProcess === proc {
+                        self?.activeShellProcess = nil
+                    }
+                }
                 continuation.resume(returning: (proc.terminationStatus == 0, (out + "\n" + err).trimmingCharacters(in: .whitespacesAndNewlines)))
             }
 
             do {
                 try process.run()
+                activeShellProcess = process
             } catch {
                 continuation.resume(returning: (false, error.localizedDescription))
             }

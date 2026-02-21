@@ -22,6 +22,13 @@ struct SettingsView: View {
     @State private var queueMessage: String?
     @State private var showOllamaInstallConfirmation = false
 
+    private var appVersionLabel: String {
+        let info = Bundle.main.infoDictionary ?? [:]
+        let version = info["CFBundleShortVersionString"] as? String ?? "—"
+        let build = info["CFBundleVersion"] as? String ?? "—"
+        return "v\(version) (\(build))"
+    }
+
     init(app: AppState) {
         self.app = app
         self._ollamaManager = ObservedObject(wrappedValue: app.ollamaManager)
@@ -36,6 +43,7 @@ struct SettingsView: View {
                 captureSection
                 ingestionQueueSection
                 llmSection
+                appInfoSection
                 if pendingCount > 0 {
                     pendingBanner
                 }
@@ -78,6 +86,21 @@ This runs local commands on your Mac:
 2) ollama pull \(OllamaClient.defaultModel)
 3) ollama serve
 """)
+        }
+    }
+
+    private var appInfoSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("App Info")
+                .font(.headline)
+            HStack {
+                Text("App Version")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(appVersionLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -221,6 +244,13 @@ This runs local commands on your Mac:
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(ollamaManager.isBusy || isCheckingOllama)
+
+                Button(action: { ollamaManager.cancelInstallAndStart() }) {
+                    Label("Stop", systemImage: "stop.fill")
+                }
+                .buttonStyle(.bordered)
+                .tint(.red)
+                .disabled(!ollamaManager.isBusy)
 
                 Text(ollamaManager.statusMessage)
                     .font(.caption)
