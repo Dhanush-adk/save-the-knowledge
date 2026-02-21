@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import Security
 
 final class FeedbackReporter {
     private let pendingStore: PendingFeedbackStore
@@ -609,8 +608,7 @@ final class FeedbackReporter {
 }
 
 private enum InstallTokenKeychain {
-    private static let service = "com.knowledgecache.installtoken"
-    private static let account = "install_token_v1"
+    private static let tokenDefaultsKey = "KnowledgeCache.installToken.v1"
     private static let cacheLock = NSLock()
     private static var cachedToken: String?
 
@@ -622,56 +620,22 @@ private enum InstallTokenKeychain {
         }
         cacheLock.unlock()
 
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        var result: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess,
-              let data = result as? Data,
-              let token = String(data: data, encoding: .utf8),
-              !token.isEmpty else { return nil }
-        cacheLock.lock()
-        cachedToken = token
-        cacheLock.unlock()
-        return token
-    }
-
-    static func storeToken(_ token: String) -> Bool {
-        guard let data = token.data(using: .utf8) else { return false }
-        let attrs: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
-        ]
-        let addStatus = SecItemAdd(attrs as CFDictionary, nil)
-        if addStatus == errSecSuccess {
+        if let token = UserDefaults.standard.string(forKey: tokenDefaultsKey),
+           !token.isEmpty {
             cacheLock.lock()
             cachedToken = token
             cacheLock.unlock()
-            return true
+            return token
         }
-        if addStatus == errSecDuplicateItem {
-            let query: [String: Any] = [
-                kSecClass as String: kSecClassGenericPassword,
-                kSecAttrService as String: service,
-                kSecAttrAccount as String: account
-            ]
-            let updates: [String: Any] = [kSecValueData as String: data]
-            let ok = SecItemUpdate(query as CFDictionary, updates as CFDictionary) == errSecSuccess
-            if ok {
-                cacheLock.lock()
-                cachedToken = token
-                cacheLock.unlock()
-            }
-            return ok
-        }
-        return false
+
+        return nil
+    }
+
+    static func storeToken(_ token: String) -> Bool {
+        UserDefaults.standard.set(token, forKey: tokenDefaultsKey)
+        cacheLock.lock()
+        cachedToken = token
+        cacheLock.unlock()
+        return true
     }
 }

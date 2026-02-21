@@ -136,8 +136,7 @@ private enum QueueCrypto {
 }
 
 private enum QueueCryptoKeychain {
-    private static let service = "com.knowledgecache.feedbackqueue"
-    private static let account = "pending_feedback_key_v1"
+    private static let keyFileSubpath = "KnowledgeCache/pending_feedback.key"
     private static let cacheLock = NSLock()
     private static var cachedKeyData: Data?
 
@@ -168,40 +167,26 @@ private enum QueueCryptoKeychain {
     }
 
     private static func readKeyData() -> Data? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        var result: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess else { return nil }
-        return result as? Data
+        let fileURL = keyFileURL()
+        guard let data = try? Data(contentsOf: fileURL), data.count == 32 else { return nil }
+        return data
     }
 
     private static func storeKeyData(_ data: Data) -> Bool {
-        let attrs: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
-        ]
-        let addStatus = SecItemAdd(attrs as CFDictionary, nil)
-        if addStatus == errSecSuccess { return true }
-        if addStatus == errSecDuplicateItem {
-            let query: [String: Any] = [
-                kSecClass as String: kSecClassGenericPassword,
-                kSecAttrService as String: service,
-                kSecAttrAccount as String: account
-            ]
-            let updates: [String: Any] = [
-                kSecValueData as String: data
-            ]
-            return SecItemUpdate(query as CFDictionary, updates as CFDictionary) == errSecSuccess
+        let fileURL = keyFileURL()
+        let parent = fileURL.deletingLastPathComponent()
+        do {
+            try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+            try data.write(to: fileURL, options: .atomic)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
+            return true
+        } catch {
+            return false
         }
-        return false
+    }
+
+    private static func keyFileURL() -> URL {
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return dir.appendingPathComponent(keyFileSubpath)
     }
 }
