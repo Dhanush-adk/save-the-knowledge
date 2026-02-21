@@ -18,11 +18,6 @@ final class AppUpdateManager: ObservableObject {
 
     func checkForUpdates() async {
         guard !isChecking else { return }
-        if restartRequiredAfterUpgrade {
-            isUpdateAvailable = false
-            statusMessage = "Upgrade installed. Restart app to finish update."
-            return
-        }
         isChecking = true
         defer { isChecking = false }
 
@@ -33,8 +28,11 @@ final class AppUpdateManager: ObservableObject {
             latestVersionLabel = release.displayLabel
             if isReleaseNewerThanCurrent(release) {
                 isUpdateAvailable = true
-                statusMessage = "Update available: \(release.displayLabel)"
+                statusMessage = restartRequiredAfterUpgrade
+                    ? "Restart did not switch to the latest app yet. Update still available: \(release.displayLabel)"
+                    : "Update available: \(release.displayLabel)"
             } else {
+                restartRequiredAfterUpgrade = false
                 isUpdateAvailable = false
                 statusMessage = "Up to date (\(currentDisplayVersion()))."
             }
