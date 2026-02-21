@@ -533,6 +533,7 @@ final class AppState: ObservableObject {
     let networkMonitor: NetworkMonitor
     let feedbackReporter: FeedbackReporter
     let ollamaManager: OllamaServiceManager
+    let appUpdateManager: AppUpdateManager
     let fileBookmarkStore: FileBookmarkStore
     let ingestionQueueStore: IngestionQueueStore
     let capturePolicy: any CapturePolicyEvaluating
@@ -633,6 +634,7 @@ final class AppState: ObservableObject {
         let issueStore = PendingIssueStore()
         self.feedbackReporter = FeedbackReporter(pendingStore: pendingStore, issueStore: issueStore)
         self.ollamaManager = OllamaServiceManager()
+        self.appUpdateManager = AppUpdateManager()
         self.fileBookmarkStore = FileBookmarkStore()
         self.ingestionQueueStore = IngestionQueueStore()
         self.capturePolicy = DefaultCapturePolicyEngine()
@@ -665,6 +667,7 @@ final class AppState: ObservableObject {
                 self?.feedbackReporter.flushPendingIssues(isConnected: connected)
                 self?.feedbackReporter.flushPendingAnalytics(isConnected: connected)
                 await self?.refreshAppUpdateInfo()
+                await self?.appUpdateManager.checkForUpdates()
                 await self?.refreshOllamaAvailability()
             }
         }
@@ -680,6 +683,7 @@ final class AppState: ObservableObject {
             feedbackReporter.sendAnalyticsIfNeeded(savesCount: (try? store.fetchAllItems())?.count ?? 0, isConnected: connected)
             trackSessionStarted()
             await refreshAppUpdateInfo()
+            await appUpdateManager.checkForUpdates()
             await refreshOllamaAvailability()
         }
         Task.detached(priority: .utility) { [weak embedding] in

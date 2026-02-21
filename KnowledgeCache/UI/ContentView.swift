@@ -36,9 +36,14 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(Tab.allCases, id: \.self, selection: $selectedTab) { tab in
-                Label(tab.rawValue, systemImage: tab.icon)
-                    .tag(tab)
+            List(selection: $selectedTab) {
+                Section("Navigate") {
+                    ForEach(Tab.allCases, id: \.self) { tab in
+                        Label(tab.rawValue, systemImage: tab.icon)
+                            .tag(tab)
+                    }
+                }
+                SidebarUpdateSection(updater: app.appUpdateManager)
             }
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 220)
@@ -82,9 +87,56 @@ struct ContentView: View {
             app.refreshItems()
             app.refreshHistory()
             app.refreshChatThreads()
+            Task { await app.appUpdateManager.checkForUpdates() }
             if !onboardingCompleted, !hasPresentedSetup {
                 hasPresentedSetup = true
                 showGuidedSetup = true
+            }
+        }
+    }
+}
+
+private struct SidebarUpdateSection: View {
+    @ObservedObject var updater: AppUpdateManager
+
+    var body: some View {
+        Section("App Update") {
+            HStack(spacing: 8) {
+                if updater.isChecking || updater.isUpgrading {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: updater.isUpdateAvailable ? "arrow.down.circle.fill" : "checkmark.circle.fill")
+                        .foregroundStyle(updater.isUpdateAvailable ? .orange : .green)
+                }
+                Text(updater.statusMessage)
+                    .font(.caption)
+                    .lineLimit(2)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 8) {
+                Button("Check") {
+                    Task { await updater.checkForUpdates() }
+                }
+                .buttonStyle(.bordered)
+                .disabled(updater.isChecking || updater.isUpgrading)
+
+                if updater.isUpdateAvailable {
+                    Button("Upgrade") {
+                        Task { await updater.upgradeToLatest() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(updater.isUpgrading || updater.isChecking)
+                }
+
+                if updater.isUpgrading {
+                    Button("Stop") {
+                        updater.cancelUpgrade()
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+                }
             }
         }
     }
