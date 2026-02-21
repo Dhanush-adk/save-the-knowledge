@@ -116,6 +116,13 @@ private struct SidebarUpdateSection: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .foregroundStyle(.secondary)
             }
+            if !updater.diagnosticsMessage.isEmpty {
+                Text(updater.diagnosticsMessage)
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(4)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             HStack(spacing: 8) {
                 Button("Check") {

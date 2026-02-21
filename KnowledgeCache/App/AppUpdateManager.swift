@@ -9,6 +9,7 @@ final class AppUpdateManager: ObservableObject {
     @Published var restartRequiredAfterUpgrade = false
     @Published var statusMessage = "Not checked yet."
     @Published var latestVersionLabel: String?
+    @Published var diagnosticsMessage = ""
 
     private var activeShellProcess: Process?
 
@@ -18,10 +19,15 @@ final class AppUpdateManager: ObservableObject {
     private let cask = "save-the-knowledge"
     private let appDisplayName = "Save the Knowledge"
 
+    init() {
+        refreshDiagnostics()
+    }
+
     func checkForUpdates() async {
         guard !isChecking else { return }
         isChecking = true
         defer { isChecking = false }
+        refreshDiagnostics()
 
         statusMessage = "Checking for updates..."
 
@@ -48,6 +54,7 @@ final class AppUpdateManager: ObservableObject {
     func upgradeToLatest() async {
         guard !isUpgrading else { return }
         isUpgrading = true
+        refreshDiagnostics()
         statusMessage = "Preparing upgrade..."
         defer {
             isUpgrading = false
@@ -125,6 +132,12 @@ final class AppUpdateManager: ObservableObject {
         guard let process = activeShellProcess, process.isRunning else { return }
         process.terminate()
         statusMessage = "Cancelling upgrade..."
+    }
+
+    func refreshDiagnostics() {
+        let appPath = Bundle.main.bundleURL.path
+        let brew = resolveHomebrewPath() ?? "not found"
+        diagnosticsMessage = "App: \(appPath)\nBrew: \(brew)"
     }
 
     private func currentDisplayVersion() -> String {
