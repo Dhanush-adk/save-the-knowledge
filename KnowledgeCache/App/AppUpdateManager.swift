@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 
 @MainActor
 final class AppUpdateManager: ObservableObject {
@@ -46,17 +47,44 @@ final class AppUpdateManager: ObservableObject {
     func upgradeToLatest() async {
         guard !isUpgrading else { return }
         isUpgrading = true
-        statusMessage = "Upgrading app with Homebrew..."
+        statusMessage = "Preparing upgrade..."
         defer {
             isUpgrading = false
             activeShellProcess = nil
         }
 
+        let release: ReleaseInfo
+        do {
+            release = try await fetchLatestRelease()
+            latestVersionLabel = release.displayLabel
+        } catch {
+            statusMessage = "Could not fetch latest release."
+            AppLogger.warning("Updater: latest release fetch failed - \(error.localizedDescription)")
+            return
+        }
+
+        guard isReleaseNewerThanCurrent(release) else {
+            restartRequiredAfterUpgrade = false
+            isUpdateAvailable = false
+            statusMessage = "Up to date (\(currentDisplayVersion()))."
+            return
+        }
+
+        guard let brewPath = resolveHomebrewPath() else {
+            statusMessage = "Homebrew not found. Downloading installer DMG..."
+            let opened = await downloadAndOpenDMG(for: release)
+            if opened {
+                statusMessage = "Installer opened. Drag the new app to Applications, then restart."
+            } else {
+                statusMessage = "Could not open installer DMG. Download from GitHub Releases."
+            }
+            return
+        }
+
+        statusMessage = "Upgrading app with Homebrew..."
+
         let command = """
-        if command -v brew >/dev/null 2>&1; then BREW=brew; \
-        elif [ -x /opt/homebrew/bin/brew ]; then BREW=/opt/homebrew/bin/brew; \
-        elif [ -x /usr/local/bin/brew ]; then BREW=/usr/local/bin/brew; \
-        else echo '__BREW_NOT_FOUND__'; exit 127; fi
+        BREW="\(brewPath)"
         "$BREW" tap \(tap) >/dev/null 2>&1 || true
         "$BREW" update
         if "$BREW" list --cask \(cask) >/dev/null 2>&1; then
@@ -69,9 +97,7 @@ final class AppUpdateManager: ObservableObject {
         let result = await runShell(command)
         if !result.success {
             let output = result.output.lowercased()
-            if output.contains("__brew_not_found__") || output.contains("command not found") {
-                statusMessage = "Homebrew not found. Install Homebrew, then retry."
-            } else if output.contains("cancelled") || output.contains("terminated") {
+            if output.contains("cancelled") || output.contains("terminated") {
                 statusMessage = "Upgrade cancelled."
             } else {
                 statusMessage = "Upgrade failed. Open Terminal and run: brew reinstall --cask \(cask)"
@@ -113,6 +139,42 @@ final class AppUpdateManager: ObservableObject {
         return false
     }
 
+    private func resolveHomebrewPath() -> String? {
+        let fm = FileManager.default
+        let candidates = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
+        for path in candidates where fm.isExecutableFile(atPath: path) {
+            return path
+        }
+        return nil
+    }
+
+    private func downloadAndOpenDMG(for release: ReleaseInfo) async -> Bool {
+        guard let downloadURL = release.dmgDownloadURL else { return false }
+        var request = URLRequest(url: downloadURL)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 180
+
+        do {
+            let (tmpURL, response) = try await URLSession.shared.download(for: request)
+            let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+            guard code == 200 else { return false }
+
+            let fm = FileManager.default
+            let downloads = fm.urls(for: .downloadsDirectory, in: .userDomainMask).first ?? fm.temporaryDirectory
+            let fileName = release.dmgAssetName ?? "save-the-knowledge-update.dmg"
+            let destination = downloads.appendingPathComponent(fileName)
+
+            if fm.fileExists(atPath: destination.path) {
+                try? fm.removeItem(at: destination)
+            }
+            try fm.moveItem(at: tmpURL, to: destination)
+            return NSWorkspace.shared.open(destination)
+        } catch {
+            AppLogger.warning("Updater: dmg download/open failed - \(error.localizedDescription)")
+            return false
+        }
+    }
+
     private func fetchLatestRelease() async throws -> ReleaseInfo {
         guard let url = URL(string: "https://api.github.com/repos/\(owner)/\(repo)/releases/latest") else {
             throw URLError(.badURL)
@@ -133,8 +195,12 @@ final class AppUpdateManager: ObservableObject {
         let version = decoded.tagName.replacingOccurrences(of: "^v", with: "", options: .regularExpression)
         let dmg = decoded.assets.first(where: { $0.name.localizedCaseInsensitiveContains(cask) && $0.name.lowercased().hasSuffix(".dmg") })
         let build = dmg.flatMap { Self.extractBuild(fromAssetName: $0.name) }
-
-        return ReleaseInfo(version: version, build: build)
+        return ReleaseInfo(
+            version: version,
+            build: build,
+            dmgAssetName: dmg?.name,
+            dmgDownloadURL: dmg.flatMap { URL(string: $0.browserDownloadURL) }
+        )
     }
 
     private static func extractBuild(fromAssetName name: String) -> Int? {
@@ -181,6 +247,8 @@ final class AppUpdateManager: ObservableObject {
 private struct ReleaseInfo {
     let version: String
     let build: Int?
+    let dmgAssetName: String?
+    let dmgDownloadURL: URL?
 
     var displayLabel: String {
         if let build {
@@ -202,4 +270,10 @@ private struct GitHubRelease: Decodable {
 
 private struct GitHubAsset: Decodable {
     let name: String
+    let browserDownloadURL: String
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case browserDownloadURL = "browser_download_url"
+    }
 }
