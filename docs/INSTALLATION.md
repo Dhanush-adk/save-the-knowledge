@@ -39,7 +39,7 @@ xcodebuild -project KnowledgeCache.xcodeproj -scheme KnowledgeCache -destination
 
 ```bash
 brew install ollama
-ollama pull llama3.2:1b
+ollama pull llama3.2:latest
 ```
 
 Then enable/use Ollama from app settings.

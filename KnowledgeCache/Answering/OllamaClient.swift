@@ -3,7 +3,7 @@
 //  KnowledgeCache
 //
 //  Calls local Ollama (http://localhost:11434) for text generation. No model is shipped;
-//  user installs Ollama and runs e.g. "ollama pull llama3.2:1b" once.
+//  user installs Ollama and runs e.g. "ollama pull llama3.2:latest" once.
 //
 
 import Foundation
@@ -11,8 +11,8 @@ import AppKit
 
 enum OllamaClient {
     static let defaultBaseURL = URL(string: "http://localhost:11434")!
-    /// Model to use for answer generation (smaller default for faster first-time pull).
-    static let defaultModel = "llama3.2:1b"
+    /// Model to use for answer generation (e.g. llama3.2:latest; user must have pulled it).
+    static let defaultModel = "llama3.2:latest"
     static let defaultTimeout: TimeInterval = 60
     static let statusCheckTimeout: TimeInterval = 8
 
