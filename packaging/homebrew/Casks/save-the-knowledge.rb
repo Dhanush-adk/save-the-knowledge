@@ -1,6 +1,6 @@
 cask "save-the-knowledge" do
-  version "1.1.6,14"
-  sha256 "0da7656d152956c498afb49998d09f3ca755208c95c08d9f964e7a2c8db9d667"
+  version "1.1.7,15"
+  sha256 "188f4e699f5df684d8848f5bd6a6fc296ac7fc5e0540f046831e2eb77d3d0f43"
 
   url "https://github.com/Dhanush-adk/save-the-knowledge/releases/download/v#{version.csv.first}/save-the-knowledge-macOS-v#{version.csv.first}-b#{version.csv.second}-unsigned.dmg",
       verified: "github.com/Dhanush-adk/save-the-knowledge/"
