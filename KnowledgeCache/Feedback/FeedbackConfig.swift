@@ -15,7 +15,7 @@ enum FeedbackConfig {
     /// Set to empty string to disable sending (feedback will still be queued offline).
     static var baseURL: String {
         // Set this to your current production deployment/custom domain.
-        "https://feedback-server-d0wev5d0z-dhanushs-projects-acfd41f9.vercel.app"
+        "https://feedback-server-psi.vercel.app"
     }
 
     /// Optional: Vercel "Protection Bypass for Automation" secret. If set, sent as
