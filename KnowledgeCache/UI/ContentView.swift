@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct ContentView: View {
     @StateObject private var app = AppState()
@@ -122,7 +123,13 @@ private struct SidebarUpdateSection: View {
                 .buttonStyle(.bordered)
                 .disabled(updater.isChecking || updater.isUpgrading)
 
-                if updater.isUpdateAvailable {
+                if updater.restartRequiredAfterUpgrade {
+                    Button("Restart") {
+                        NSApp.terminate(nil)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(updater.isUpgrading || updater.isChecking)
+                } else if updater.isUpdateAvailable {
                     Button("Upgrade") {
                         Task { await updater.upgradeToLatest() }
                     }

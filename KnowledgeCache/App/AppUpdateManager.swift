@@ -5,6 +5,7 @@ final class AppUpdateManager: ObservableObject {
     @Published var isChecking = false
     @Published var isUpgrading = false
     @Published var isUpdateAvailable = false
+    @Published var restartRequiredAfterUpgrade = false
     @Published var statusMessage = "Not checked yet."
     @Published var latestVersionLabel: String?
 
@@ -17,6 +18,11 @@ final class AppUpdateManager: ObservableObject {
 
     func checkForUpdates() async {
         guard !isChecking else { return }
+        if restartRequiredAfterUpgrade {
+            isUpdateAvailable = false
+            statusMessage = "Upgrade installed. Restart app to finish update."
+            return
+        }
         isChecking = true
         defer { isChecking = false }
 
@@ -75,8 +81,9 @@ final class AppUpdateManager: ObservableObject {
             return
         }
 
-        statusMessage = "Upgrade complete. Restart app to use the newest version."
-        await checkForUpdates()
+        restartRequiredAfterUpgrade = true
+        isUpdateAvailable = false
+        statusMessage = "Upgrade installed. Restart app to finish update."
     }
 
     func cancelUpgrade() {
