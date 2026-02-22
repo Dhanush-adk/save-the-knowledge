@@ -24,7 +24,7 @@ bash ./scripts/update_homebrew_cask.sh
 ```
 
 3. Commit and push cask updates.
-4. Publish GitHub release tag `v<version>`.
+4. Publish a GitHub release tag (for example, `v1.1.11`).
 5. Upload DMG asset generated under `build/release/`.
 
 ## Cask Locations

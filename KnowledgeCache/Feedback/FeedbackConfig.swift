@@ -2,7 +2,7 @@
 //  FeedbackConfig.swift
 //  KnowledgeCache
 //
-//  Set your backend base URL for feedback and analytics. Replace with your hosted endpoint.
+//  Backend configuration for feedback and analytics endpoints.
 //
 
 import Foundation
@@ -14,7 +14,7 @@ enum FeedbackConfig {
     /// → set to "Only Preview Deployments" so production is public. See feedback-server/FIX-401.md.
     /// Set to empty string to disable sending (feedback will still be queued offline).
     static var baseURL: String {
-        // Set this to your current production deployment/custom domain.
+        // Current production feedback server endpoint.
         "https://feedback-server-psi.vercel.app"
     }
 

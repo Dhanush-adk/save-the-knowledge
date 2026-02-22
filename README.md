@@ -91,4 +91,4 @@ If you plan to contribute, start with:
 
 ## License
 
-Add your preferred license file (for example `MIT`) before public launch.
+MIT License. See `LICENSE`.

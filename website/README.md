@@ -34,13 +34,13 @@ Set publish directory to `website`, or drag/drop the folder into Netlify Drop.
 
 ## Before publishing
 
-Replace placeholder links in `index.html`:
+Confirm project links in `index.html`:
 
 - `https://github.com/Dhanush-adk/save-the-knowledge`
 
 Optional:
 
-- Update download CTA to your latest release asset URL.
+- Update download CTA to the latest release asset URL.
 - Update footer legal text/policies if needed.
 
 ## Related docs

@@ -59,7 +59,7 @@ Production backend for **Save the Knowledge** desktop app telemetry, feedback, i
 
 2. Install token strategy
 - `FEEDBACK_TOKEN_SECRET` (preferred) or `FEEDBACK_SESSION_SECRET`
-- app calls `POST /api/register-install`, then sends `Authorization: Bearer <token>`
+- app calls `POST /api/register-install`, then sends `Authorization: Bearer $INSTALL_TOKEN`
 
 ### Dashboard/read protection
 
