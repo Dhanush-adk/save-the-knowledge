@@ -40,9 +40,11 @@
 		8BB07C596C9ED92CAE4EA28F /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ACF4DDB705AC3E3963E9784 /* HistoryView.swift */; };
 		8C439A671289E579EB8323AA /* AppUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D8E3648B3F4F9F54CB5808D /* AppUpdateManager.swift */; };
 		8D85FD5402961DB98F3243DB /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4822009829FF36273EC951B /* AppState.swift */; };
+		90EC83A5FE59AAA93AFDFB8A /* extract_structured.py in Resources */ = {isa = PBXBuildFile; fileRef = 490909B5C260ED600BA30386 /* extract_structured.py */; };
 		952B2471F8DACB32CBE3691F /* SavedItemsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 664A12CFB9E48C60D50A47AC /* SavedItemsView.swift */; };
 		98F493BC2DDF681E172E1FF7 /* MiniLMTokenizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA5FB59366D78B8D82D37605 /* MiniLMTokenizer.swift */; };
 		9E4AE8C288845F9B2EAA6845 /* EmbeddingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51285D7F286A8B6625672B4B /* EmbeddingService.swift */; };
+		ABA69043BD0F0BFC02FFF920 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4413BB9CF3C308B068E70A4C /* Assets.xcassets */; };
 		BBDB3E014210C519C007D2C1 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = E6A138995B5F2C1773A3EE0E /* libsqlite3.tbd */; };
 		BD72DCF694E1C69A8A4ECB3E /* MockEmbeddingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19A755156AA0F1D8153560D3 /* MockEmbeddingService.swift */; };
 		BFBE7F7EDDA8D302190D31AD /* AnswerGeneratorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 879FE666FF56EA4EF28EC3C6 /* AnswerGeneratorTests.swift */; };
@@ -85,7 +87,9 @@
 		29655C73956B61528246500B /* KnowledgeCache.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = KnowledgeCache.entitlements; sourceTree = "<group>"; };
 		2A142E94E5643CE779F1B1CC /* PendingFeedbackStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingFeedbackStore.swift; sourceTree = "<group>"; };
 		3D98C90E3D3DA0AC98C36870 /* Chunker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Chunker.swift; sourceTree = "<group>"; };
+		4413BB9CF3C308B068E70A4C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		478256DEEFCDA5354F676647 /* EmbeddingProviding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddingProviding.swift; sourceTree = "<group>"; };
+		490909B5C260ED600BA30386 /* extract_structured.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = extract_structured.py; sourceTree = "<group>"; };
 		4F9D73777BFCB2352BD3544C /* SourceRef.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceRef.swift; sourceTree = "<group>"; };
 		51285D7F286A8B6625672B4B /* EmbeddingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddingService.swift; sourceTree = "<group>"; };
 		5216EE9F6C2ADE4DE390266E /* Database.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Database.swift; sourceTree = "<group>"; };
@@ -149,6 +153,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		1020442CCCFA9035F6C9C94C /* scripts */ = {
+			isa = PBXGroup;
+			children = (
+				490909B5C260ED600BA30386 /* extract_structured.py */,
+			);
+			path = scripts;
+			sourceTree = "<group>";
+		};
 		200C34CC8B4F89E3B5116331 /* Feedback */ = {
 			isa = PBXGroup;
 			children = (
@@ -292,6 +304,7 @@
 		CFBC66D56FB4AF98B2659CB3 /* KnowledgeCache */ = {
 			isa = PBXGroup;
 			children = (
+				4413BB9CF3C308B068E70A4C /* Assets.xcassets */,
 				B8D3C5928AA64C3663B555F1 /* Info.plist */,
 				29655C73956B61528246500B /* KnowledgeCache.entitlements */,
 				EC15C96470A253700EBD034B /* Answering */,
@@ -313,6 +326,7 @@
 			children = (
 				CFBC66D56FB4AF98B2659CB3 /* KnowledgeCache */,
 				48751CC8070CD2233DEF543F /* KnowledgeCacheTests */,
+				1020442CCCFA9035F6C9C94C /* scripts */,
 				5BC8D9DE3FCD736E33909FC3 /* Frameworks */,
 				31B8CBFCB7D519802403C827 /* Products */,
 			);
@@ -402,6 +416,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				ABA69043BD0F0BFC02FFF920 /* Assets.xcassets in Resources */,
+				90EC83A5FE59AAA93AFDFB8A /* extract_structured.py in Resources */,
 				7A41A241D15C60B476953C98 /* minilm_vocab.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

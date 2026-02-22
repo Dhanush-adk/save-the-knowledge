@@ -13,13 +13,10 @@ targets:
     sources:
       - path: KnowledgeCache
         excludes:
-          - "*.xcassets"
           - "EmbeddingModel.mlpackage"
           - "EmbeddingModel.mlmodel"
-    resources:
-      - path: KnowledgeCache/Assets.xcassets
       - path: scripts/extract_structured.py
-      - path: KnowledgeCache/EmbeddingModel.mlpackage
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.savetheknowledge.app
