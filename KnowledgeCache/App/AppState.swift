@@ -516,6 +516,7 @@ final class BrowserSessionService {
 final class AppState: ObservableObject {
     private static let useOllamaAnswersKey = "KnowledgeCache.useOllamaAnswers"
     private static let chatAnswerModeKey = "KnowledgeCache.chatAnswerMode"
+    private static let dismissedAnnouncementIDsKey = "KnowledgeCache.dismissedAnnouncementIDs"
     private static let legacyUseAgenticFolderSearchKey = "KnowledgeCache.useAgenticFolderSearch"
     private static let legacyAgenticSearchFolderPathKey = "KnowledgeCache.agenticSearchFolderPath"
     nonisolated private static let autoSaveVisitedPagesKey = "KnowledgeCache.autoSaveVisitedPages"
@@ -572,6 +573,7 @@ final class AppState: ObservableObject {
         model: OllamaClient.defaultModel
     )
     @Published var availableAppUpdate: FeedbackReporter.AppUpdateInfo?
+    @Published var activeAnnouncement: FeedbackReporter.AppUpdateInfo.Announcement?
     @Published var saveSuccess: String?
     @Published var saveJobState: SaveJobState = .idle
     @Published var queryLatencyP95Ms: Int = 0
@@ -1151,6 +1153,16 @@ final class AppState: ObservableObject {
         availableAppUpdate = nil
     }
 
+    func dismissActiveAnnouncement() {
+        guard let announcement = activeAnnouncement else { return }
+        if announcement.dismissible {
+            var ids = Set(UserDefaults.standard.stringArray(forKey: Self.dismissedAnnouncementIDsKey) ?? [])
+            ids.insert(announcement.id)
+            UserDefaults.standard.set(Array(ids), forKey: Self.dismissedAnnouncementIDsKey)
+        }
+        activeAnnouncement = nil
+    }
+
     func refreshOllamaAvailability() async {
         ollamaAvailability = await OllamaClient.checkAvailability(model: OllamaClient.defaultModel)
     }
@@ -1161,6 +1173,16 @@ final class AppState: ObservableObject {
             availableAppUpdate = update
         } else {
             availableAppUpdate = nil
+        }
+        activeAnnouncement = nil
+        if let announcement = update?.announcement,
+           !announcement.id.isEmpty,
+           !announcement.text.isEmpty,
+           announcement.isActiveNow {
+            let dismissed = Set(UserDefaults.standard.stringArray(forKey: Self.dismissedAnnouncementIDsKey) ?? [])
+            if !(announcement.dismissible && dismissed.contains(announcement.id)) {
+                activeAnnouncement = announcement
+            }
         }
     }
 
@@ -1510,7 +1532,9 @@ final class AppState: ObservableObject {
 
         switch requestedMode {
         case .ollama:
-            return false
+            // Ollama mode should still be grounded in retrieved KB context.
+            // It only changes answer generation style/model, not source selection.
+            return true
         case .grounded:
             // In grounded mode, prioritize document retrieval by default.
             // Only bypass KB for clear social/opening prompts to avoid losing source-grounded answers.

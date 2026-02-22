@@ -78,6 +78,13 @@ Production backend for **Save the Knowledge** desktop app telemetry, feedback, i
 - `APP_MINIMUM_VERSION`
 - `APP_DOWNLOAD_URL`
 - `APP_RELEASE_NOTES`
+- `APP_BANNER_ID` (change this per new announcement so dismiss state resets)
+- `APP_BANNER_TEXT` (banner message shown in app)
+- `APP_BANNER_URL` (optional link opened from banner)
+- `APP_BANNER_LEVEL` (`info` | `success` | `warning` | `critical`)
+- `APP_BANNER_DISMISSIBLE` (`true`/`false`, default `true`)
+- `APP_BANNER_STARTS_AT` (optional ISO-8601 timestamp)
+- `APP_BANNER_ENDS_AT` (optional ISO-8601 timestamp)
 - `MAX_ANALYTICS`, `MAX_FEEDBACK`, `MAX_SAVED_URLS`, `MAX_ISSUES`, `MAX_IDEMPOTENCY_KEYS`
 - `MONGO_READ_LIMIT_ANALYTICS`, `MONGO_READ_LIMIT_FEEDBACK`, `MONGO_READ_LIMIT_SAVED_URLS`, `MONGO_READ_LIMIT_ISSUES`
 - `MONGO_KPI_ANALYTICS_LIMIT`

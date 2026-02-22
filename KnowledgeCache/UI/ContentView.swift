@@ -49,23 +49,32 @@ struct ContentView: View {
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 220)
         } detail: {
-            Group {
-                switch selectedTab {
-                case .chat:
-                    ChatView(app: app)
-                case .web:
-                    WebSearchView(app: app)
-                case .save:
-                    SaveView(app: app)
-                case .saved:
-                    SavedItemsView(app: app)
-                case .history:
-                    HistoryView(app: app)
-                case .settings:
-                    SettingsView(app: app)
+            VStack(spacing: 0) {
+                if let announcement = app.activeAnnouncement {
+                    AppAnnouncementBanner(announcement: announcement) {
+                        app.dismissActiveAnnouncement()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.top, 10)
                 }
+                Group {
+                    switch selectedTab {
+                    case .chat:
+                        ChatView(app: app)
+                    case .web:
+                        WebSearchView(app: app)
+                    case .save:
+                        SaveView(app: app)
+                    case .saved:
+                        SavedItemsView(app: app)
+                    case .history:
+                        HistoryView(app: app)
+                    case .settings:
+                        SettingsView(app: app)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationTitle(selectedTab.rawValue)
         .frame(minWidth: 700, minHeight: 500)
@@ -94,6 +103,67 @@ struct ContentView: View {
                 showGuidedSetup = true
             }
         }
+    }
+}
+
+private struct AppAnnouncementBanner: View {
+    let announcement: FeedbackReporter.AppUpdateInfo.Announcement
+    let onDismiss: () -> Void
+
+    private var accentColor: Color {
+        switch announcement.level {
+        case .info: return .blue
+        case .success: return .green
+        case .warning: return .orange
+        case .critical: return .red
+        }
+    }
+
+    private var iconName: String {
+        switch announcement.level {
+        case .info: return "info.circle.fill"
+        case .success: return "checkmark.seal.fill"
+        case .warning: return "exclamationmark.triangle.fill"
+        case .critical: return "exclamationmark.octagon.fill"
+        }
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: iconName)
+                .foregroundStyle(accentColor)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(announcement.text)
+                    .font(.subheadline)
+                    .foregroundStyle(.primary)
+                if let rawURL = announcement.url,
+                   let url = URL(string: rawURL),
+                   !rawURL.isEmpty {
+                    Link("Open update", destination: url)
+                        .font(.caption.weight(.semibold))
+                }
+            }
+            Spacer(minLength: 8)
+            if announcement.dismissible {
+                Button {
+                    onDismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+            }
+        }
+        .padding(10)
+        .background(accentColor.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(accentColor.opacity(0.22), lineWidth: 1)
+        )
     }
 }
 

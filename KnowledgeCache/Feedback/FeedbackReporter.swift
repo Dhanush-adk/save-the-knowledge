@@ -21,10 +21,35 @@ final class FeedbackReporter {
     private let tokenRefreshLeewaySeconds: TimeInterval = 60
 
     struct AppUpdateInfo: Equatable, Sendable {
+        struct Announcement: Equatable, Sendable {
+            enum Level: String, Equatable, Sendable {
+                case info
+                case success
+                case warning
+                case critical
+            }
+
+            let id: String
+            let text: String
+            let url: String?
+            let level: Level
+            let dismissible: Bool
+            let startsAt: Date?
+            let endsAt: Date?
+
+            var isActiveNow: Bool {
+                let now = Date()
+                if let startsAt, now < startsAt { return false }
+                if let endsAt, now > endsAt { return false }
+                return true
+            }
+        }
+
         let latestVersion: String
         let minimumVersion: String?
         let downloadURL: String?
         let releaseNotes: String?
+        let announcement: Announcement?
 
         var isUpgradeRequired: Bool {
             guard let minimumVersion else { return false }
@@ -351,16 +376,55 @@ final class FeedbackReporter {
                   !latest.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 return nil
             }
+            let announcement: AppUpdateInfo.Announcement?
+            if let rawAnnouncement = json["announcement"] as? [String: Any],
+               let id = rawAnnouncement["id"] as? String,
+               let text = rawAnnouncement["text"] as? String {
+                let levelRaw = (rawAnnouncement["level"] as? String ?? "info").lowercased()
+                let level = AppUpdateInfo.Announcement.Level(rawValue: levelRaw) ?? .info
+                let startsAt = Self.parseISO8601(rawAnnouncement["starts_at"] as? String)
+                let endsAt = Self.parseISO8601(rawAnnouncement["ends_at"] as? String)
+                announcement = AppUpdateInfo.Announcement(
+                    id: id.trimmingCharacters(in: .whitespacesAndNewlines),
+                    text: text.trimmingCharacters(in: .whitespacesAndNewlines),
+                    url: (rawAnnouncement["url"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                    level: level,
+                    dismissible: (rawAnnouncement["dismissible"] as? Bool) ?? true,
+                    startsAt: startsAt,
+                    endsAt: endsAt
+                )
+            } else {
+                announcement = nil
+            }
+
             return AppUpdateInfo(
                 latestVersion: latest,
                 minimumVersion: json["minimum_version"] as? String,
                 downloadURL: json["download_url"] as? String,
-                releaseNotes: json["release_notes"] as? String
+                releaseNotes: json["release_notes"] as? String,
+                announcement: announcement
             )
         } catch {
             return nil
         }
     }
+
+    private static func parseISO8601(_ raw: String?) -> Date? {
+        guard let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { return nil }
+        return iso8601FormatterWithFractional.date(from: raw) ?? iso8601Formatter.date(from: raw)
+    }
+
+    private static let iso8601FormatterWithFractional: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private static let iso8601Formatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
 
     private func sendFeedbackItemAsync(_ item: FeedbackItem) async -> Bool {
         let (ok, _) = await sendFeedbackItemAsyncWithError(item)
