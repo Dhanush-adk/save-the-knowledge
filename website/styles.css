@@ -94,10 +94,20 @@ nav {
 }
 
 .logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
   font-weight: 600;
   font-size: 1.1rem;
   color: var(--text);
   text-decoration: none;
+}
+
+.logo-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px var(--shadow-soft);
 }
 
 .nav-cta {
@@ -537,6 +547,14 @@ main > section:not(.cases) {
   text-align: left;
 }
 
+.footer-logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  margin-bottom: 0.45rem;
+  box-shadow: 0 2px 12px var(--shadow-soft);
+}
+
 .footer-tagline {
   font-size: 1.1rem;
   font-weight: 600;
@@ -685,6 +703,15 @@ main > section:not(.cases) {
 }
 
 @media (max-width: 600px) {
+  .logo {
+    font-size: 1rem;
+  }
+
+  .logo-mark {
+    width: 26px;
+    height: 26px;
+  }
+
   .nav-link {
     display: none;
   }
