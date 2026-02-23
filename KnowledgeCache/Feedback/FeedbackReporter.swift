@@ -617,7 +617,7 @@ final class FeedbackReporter {
     }
 
     private func getOrRegisterInstallToken() async -> String? {
-        if let existing = InstallTokenKeychain.readToken(), isInstallTokenValid(existing) {
+        if let existing = InstallTokenStore.readToken(), isInstallTokenValid(existing) {
             return existing
         }
         guard let url = URL(string: baseURL + "/api/register-install") else { return nil }
@@ -639,7 +639,7 @@ final class FeedbackReporter {
                   isInstallTokenValid(token) else {
                 return nil
             }
-            _ = InstallTokenKeychain.storeToken(token)
+            _ = InstallTokenStore.storeToken(token)
             return token
         } catch {
             return nil
@@ -671,7 +671,7 @@ final class FeedbackReporter {
     }
 }
 
-private enum InstallTokenKeychain {
+private enum InstallTokenStore {
     private static let tokenDefaultsKey = "KnowledgeCache.installToken.v1"
     private static let cacheLock = NSLock()
     private static var cachedToken: String?

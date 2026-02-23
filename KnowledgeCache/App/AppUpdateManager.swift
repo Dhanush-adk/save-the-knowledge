@@ -244,14 +244,19 @@ final class AppUpdateManager: ObservableObject {
     }
 
     private func fetchLatestRelease() async throws -> ReleaseInfo {
-        guard let url = URL(string: "https://api.github.com/repos/\(owner)/\(repo)/releases/latest") else {
+        var comps = URLComponents(string: "https://api.github.com/repos/\(owner)/\(repo)/releases/latest")
+        comps?.queryItems = [URLQueryItem(name: "ts", value: String(Int(Date().timeIntervalSince1970)))]
+        guard let url = comps?.url else {
             throw URLError(.badURL)
         }
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.timeoutInterval = 12
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        request.setValue("no-cache", forHTTPHeaderField: "Pragma")
 
         let (data, response) = try await URLSession.shared.data(for: request)
         let code = (response as? HTTPURLResponse)?.statusCode ?? -1

@@ -474,7 +474,7 @@ struct WebSearchView: View {
             return tab.title
         }
         if tab.currentURL?.scheme == "data" || tab.currentURL?.scheme == "about" {
-            return "Start"
+            return "Tab"
         }
         return tab.currentURL?.host ?? "New Tab"
     }
@@ -528,10 +528,22 @@ struct BrowserWebView: NSViewRepresentable {
 
     func updateNSView(_ webView: WKWebView, context: Context) {
         if let url = urlToLoad {
-            context.coordinator.pendingURL = nil
-            urlToLoad = nil
+            if context.coordinator.pendingURL == url || webView.url == url {
+                DispatchQueue.main.async {
+                    if self.urlToLoad == url {
+                        self.urlToLoad = nil
+                    }
+                }
+                return
+            }
+            context.coordinator.pendingURL = url
             let request = URLRequest(url: url)
             webView.load(request)
+            DispatchQueue.main.async {
+                if self.urlToLoad == url {
+                    self.urlToLoad = nil
+                }
+            }
         }
     }
 
@@ -619,6 +631,7 @@ struct BrowserWebView: NSViewRepresentable {
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             isLoading = false
+            pendingURL = nil
             let url = webView.url
             currentURL = url
             pageTitle = webView.title ?? url?.host ?? "New Tab"

@@ -108,14 +108,14 @@ final class PendingFeedbackStore {
     }
 }
 
-private enum QueueCrypto {
+enum QueueCrypto {
     private struct Envelope: Codable {
         let v: Int
         let combined: String
     }
 
     static func encrypt(_ plain: Data) -> Data? {
-        guard let key = QueueCryptoKeychain.loadOrCreateKey() else { return nil }
+        guard let key = QueueCryptoKeyStore.loadOrCreateKey() else { return nil }
         guard let sealed = try? AES.GCM.seal(plain, using: key),
               let combined = sealed.combined else { return nil }
         let payload = Envelope(v: 1, combined: combined.base64EncodedString())
@@ -126,7 +126,7 @@ private enum QueueCrypto {
         guard let payload = try? JSONDecoder().decode(Envelope.self, from: raw),
               payload.v == 1,
               let combined = Data(base64Encoded: payload.combined),
-              let key = QueueCryptoKeychain.loadOrCreateKey(),
+              let key = QueueCryptoKeyStore.loadOrCreateKey(),
               let box = try? AES.GCM.SealedBox(combined: combined),
               let opened = try? AES.GCM.open(box, using: key) else {
             return nil
@@ -135,7 +135,7 @@ private enum QueueCrypto {
     }
 }
 
-private enum QueueCryptoKeychain {
+private enum QueueCryptoKeyStore {
     private static let keyFileSubpath = "KnowledgeCache/pending_feedback.key"
     private static let cacheLock = NSLock()
     private static var cachedKeyData: Data?
@@ -154,6 +154,7 @@ private enum QueueCryptoKeychain {
             cacheLock.unlock()
             return SymmetricKey(data: existing)
         }
+
         var bytes = Data(count: 32)
         let status = bytes.withUnsafeMutableBytes { ptr in
             SecRandomCopyBytes(kSecRandomDefault, 32, ptr.baseAddress!)

@@ -58,15 +58,28 @@ final class PendingAnalyticsStore {
     }
 
     private func loadUnsafe() -> [PendingAnalyticsItem] {
-        guard let data = try? Data(contentsOf: fileURL),
-              let decoded = try? JSONDecoder().decode([PendingAnalyticsItem].self, from: data) else {
+        guard let data = try? Data(contentsOf: fileURL) else {
             return []
         }
-        return decoded
+        if let decrypted = QueueCrypto.decrypt(data),
+           let decoded = try? JSONDecoder().decode([PendingAnalyticsItem].self, from: decrypted) {
+            return decoded
+        }
+
+        // Legacy plaintext migration path: read once, then rewrite encrypted.
+        if let legacy = try? JSONDecoder().decode([PendingAnalyticsItem].self, from: data) {
+            saveUnsafe(legacy)
+            return legacy
+        }
+        return []
     }
 
     private func saveUnsafe(_ items: [PendingAnalyticsItem]) {
-        guard let data = try? JSONEncoder().encode(items) else { return }
-        try? data.write(to: fileURL, options: .atomic)
+        guard let plain = try? JSONEncoder().encode(items) else { return }
+        guard let encrypted = QueueCrypto.encrypt(plain) else {
+            AppLogger.error("PendingAnalyticsStore: failed to encrypt queue payload; skip write")
+            return
+        }
+        try? encrypted.write(to: fileURL, options: .atomic)
     }
 }

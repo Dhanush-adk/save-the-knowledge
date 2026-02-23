@@ -238,8 +238,13 @@ final class OllamaServiceManager: ObservableObject {
             return
         }
 
+        guard let ollamaPath = resolveOllamaPath() else {
+            statusMessage = "Ollama command not found after install. Run manually: brew install ollama"
+            return
+        }
+
         statusMessage = "Pulling model \(model)..."
-        let pull = await runShell("ollama pull \(model)")
+        let pull = await runShell("\(shellEscape(ollamaPath)) pull \(shellEscape(model))")
         if !pull.success {
             if cancellationRequested {
                 statusMessage = "Ollama setup cancelled."
@@ -254,7 +259,7 @@ final class OllamaServiceManager: ObservableObject {
         }
 
         statusMessage = "Starting Ollama server..."
-        startServeIfNeeded()
+        startServeIfNeeded(ollamaPath: ollamaPath)
 
         let ready = await waitUntilReady(model: model, timeoutSeconds: 12)
         if ready {
@@ -279,20 +284,16 @@ final class OllamaServiceManager: ObservableObject {
     }
 
     private func hasOllamaCommand() -> Bool {
-        if runShellSync("command -v ollama >/dev/null 2>&1") == 0 {
-            return true
-        }
-        return FileManager.default.isExecutableFile(atPath: "/opt/homebrew/bin/ollama")
-            || FileManager.default.isExecutableFile(atPath: "/usr/local/bin/ollama")
+        resolveOllamaPath() != nil
     }
 
-    private func startServeIfNeeded() {
+    private func startServeIfNeeded(ollamaPath: String) {
         if let process = managedServeProcess, process.isRunning {
             return
         }
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        process.arguments = ["-lc", "ollama serve"]
+        process.executableURL = URL(fileURLWithPath: ollamaPath)
+        process.arguments = ["serve"]
         process.standardOutput = Pipe()
         process.standardError = Pipe()
         do {
@@ -356,5 +357,43 @@ final class OllamaServiceManager: ObservableObject {
         } catch {
             return -1
         }
+    }
+
+    private func resolveOllamaPath() -> String? {
+        let fm = FileManager.default
+        let candidates = ["/opt/homebrew/bin/ollama", "/usr/local/bin/ollama"]
+        for path in candidates where fm.isExecutableFile(atPath: path) {
+            return path
+        }
+        if runShellSync("command -v ollama >/dev/null 2>&1") == 0 {
+            let result = runShellSyncCapture("command -v ollama")
+            let output = result.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !output.isEmpty {
+                return output
+            }
+        }
+        return nil
+    }
+
+    private func runShellSyncCapture(_ command: String) -> String {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        process.arguments = ["-lc", command]
+        let outPipe = Pipe()
+        process.standardOutput = outPipe
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return "" }
+            let data = outPipe.fileHandleForReading.readDataToEndOfFile()
+            return String(data: data, encoding: .utf8) ?? ""
+        } catch {
+            return ""
+        }
+    }
+
+    private func shellEscape(_ value: String) -> String {
+        "'" + value.replacingOccurrences(of: "'", with: "'\"'\"'") + "'"
     }
 }

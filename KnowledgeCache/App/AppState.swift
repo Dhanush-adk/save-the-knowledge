@@ -623,7 +623,12 @@ final class AppState: ObservableObject {
         try? FileManager.default.createDirectory(at: appDir, withIntermediateDirectories: true)
         let path = appDir.appendingPathComponent("knowledge.db").path
         let database = Database(path: path)
-        try? database.open()
+        do {
+            try database.open()
+        } catch {
+            AppLogger.error("Database open/migration failed: \(error.localizedDescription)")
+            fatalError("KnowledgeCache database initialization failed: \(error.localizedDescription)")
+        }
         self.db = database
         self.store = KnowledgeStore(db: database)
         self.embedding = EmbeddingService()
@@ -833,7 +838,14 @@ final class AppState: ObservableObject {
                 updatedAt: now,
                 lastMessagePreview: question
             )
-            try? store.insertChatThread(thread)
+            do {
+                try store.insertChatThread(thread)
+            } catch {
+                AppLogger.error("Chat: failed to create thread: \(error.localizedDescription)")
+                chatError = "Could not save this chat. Please try again."
+                chatInProgress = false
+                return
+            }
             threadId = thread.id
             selectedChatThreadId = thread.id
         }
@@ -845,13 +857,25 @@ final class AppState: ObservableObject {
             content: question,
             createdAt: now
         )
-        try? store.insertChatMessage(userMessage)
+        do {
+            try store.insertChatMessage(userMessage)
+        } catch {
+            AppLogger.error("Chat: failed to persist user message: \(error.localizedDescription)")
+            chatError = "Could not save your message. Please try again."
+            chatInProgress = false
+            return
+        }
         activeChatMessages.append(userMessage)
         if let idx = chatThreads.firstIndex(where: { $0.id == threadId }) {
             if chatThreads[idx].title == "New chat" && activeChatMessages.filter({ $0.role == .user }).count <= 1 {
                 let newTitle = Self.chatThreadTitle(from: question)
                 chatThreads[idx].title = newTitle
-                try? store.updateChatThread(threadId: threadId, title: newTitle, updatedAt: now, lastMessagePreview: String(question.prefix(140)))
+                do {
+                    try store.updateChatThread(threadId: threadId, title: newTitle, updatedAt: now, lastMessagePreview: String(question.prefix(140)))
+                } catch {
+                    AppLogger.error("Chat: failed to update thread title: \(error.localizedDescription)")
+                    chatError = "Saved message, but failed to update chat title."
+                }
             }
             chatThreads[idx].updatedAt = now
             chatThreads[idx].lastMessagePreview = String(question.prefix(140))
@@ -948,7 +972,14 @@ final class AppState: ObservableObject {
                     answerText: assistantMessage.content,
                     sources: assistantMessage.sources
                 )
-                try? store.insertHistory(item: historyItem)
+                do {
+                    try store.insertHistory(item: historyItem)
+                } catch {
+                    AppLogger.error("Chat: failed to persist history item: \(error.localizedDescription)")
+                    await MainActor.run {
+                        self.chatError = "Answer generated, but failed to save history."
+                    }
+                }
                 let latencyMs = Int(Date().timeIntervalSince(startedAt) * 1000)
                 await MainActor.run {
                     self.trackQuery(
@@ -998,7 +1029,14 @@ final class AppState: ObservableObject {
                         answerText: answer.answerText,
                         sources: answer.sources
                     )
-                    try? store.insertHistory(item: historyItem)
+                    do {
+                        try store.insertHistory(item: historyItem)
+                    } catch {
+                        AppLogger.error("Chat: failed to persist history item: \(error.localizedDescription)")
+                        await MainActor.run {
+                            self.chatError = "Answer generated, but failed to save history."
+                        }
+                    }
                     let latencyMs = Int(Date().timeIntervalSince(startedAt) * 1000)
                     await MainActor.run {
                         self.trackQuery(
@@ -1115,7 +1153,14 @@ final class AppState: ObservableObject {
                         answerText: answer.answerText,
                         sources: answer.sources
                     )
-                    try? store.insertHistory(item: historyItem)
+                    do {
+                        try store.insertHistory(item: historyItem)
+                    } catch {
+                        AppLogger.error("Chat: failed to persist history item: \(error.localizedDescription)")
+                        await MainActor.run {
+                            self.chatError = "Answer generated, but failed to save history."
+                        }
+                    }
                     let latencyMs = Int(Date().timeIntervalSince(startedAt) * 1000)
                     let success = !answer.answerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     await MainActor.run {
@@ -1124,7 +1169,16 @@ final class AppState: ObservableObject {
                 }
             }
 
-            try? store.insertChatMessage(assistantMessage)
+            do {
+                try store.insertChatMessage(assistantMessage)
+            } catch {
+                AppLogger.error("Chat: failed to persist assistant message: \(error.localizedDescription)")
+                await MainActor.run {
+                    self.chatError = "Answer generated, but failed to save the chat response."
+                    self.chatInProgress = false
+                }
+                return
+            }
             await MainActor.run {
                 if self.selectedChatThreadId == threadId {
                     if let idx = self.activeChatMessages.lastIndex(where: { $0.role == .assistant && $0.threadId == threadId }) {
