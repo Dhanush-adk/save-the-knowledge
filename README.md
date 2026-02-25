@@ -82,13 +82,6 @@ If you plan to contribute, start with:
 - `docs/INSTALLATION.md`
 - `CONTRIBUTING.md`
 
-## Security and privacy notes
-
-- Do not commit secrets.
-- Keep API keys in local env files.
-- Validate input for all `feedback-server/api/*` endpoints.
-- Review `docs/feedback-api.md` before deploying backend endpoints publicly.
-
 ## License
 
 MIT License. See `LICENSE`.
